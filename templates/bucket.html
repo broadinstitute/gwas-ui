@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Choose Google Cloud Storage Bucket for Input Data{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <input type="radio" name="blob" value={{None}}> No Input Data<br>
+    {% for blob in blobs %}
+    	<input type="radio" name="blob" value={{blob}}> {{blob}}<br>
+    {% endfor %}
+    <input type="submit" value="Submit">
+  </form>
+  <p style="margin-top:1cm;">
+    <li><a href="{{ url_for('choose_project') }}">Choose a New Project</a></li>
+  </p>
+{% endblock %}

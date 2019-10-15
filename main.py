@@ -4,6 +4,7 @@ import pprint
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
+from google.cloud import storage
 
 app = Flask(__name__)
 app.config.from_mapping(SECRET_KEY='dev')
@@ -112,7 +113,7 @@ def choose_instance(project):
         instance = request.form['instance']
         print(instance)
         tokens = instance.split(',')
-        return redirect(url_for('input_data', project=project, zone=tokens[1], instance=tokens[0]))
+        return redirect(url_for('choose_bucket', project=project, zone=tokens[1], instance=tokens[0]))
 
     all_instances = []
     try:
@@ -137,8 +138,19 @@ def create_instance(project):
 
 
 @app.route('/data/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
-def input_data(project, zone, instance):
-    return "<h1>Test: {}, {}, {}</h1>".format(project, zone, instance)
+def choose_bucket(project, zone, instance):
+    client = storage.Client(project=project)
+    all_blobs = {}
+    for bucket in client.list_buckets():
+        for blob in client.list_blobs(bucket):
+            if blob.name[-1] != '/':
+                all_blobs[blob.name] = blob
+
+    if request.method == 'POST':
+        key = request.form['blob']
+        blob = all_blobs[key] if key != 'None' else None
+
+    return render_template('bucket.html', blobs=list(all_blobs.keys()))
 
 
 if __name__ == '__main__':
