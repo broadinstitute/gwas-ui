@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Select Instance from {{project}}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    {% for instance in instances %}
+    	<input type="radio" name="instance" value={{'{},{}'.format(instance[0], instance[1])}}> {{"{} ({})".format(instance[0], instance[1])}}<br>
+    {% endfor %}
+    <input type="submit" value="Submit">
+  </form>
+  <p style="margin-top:1cm;">
+    <li><a href="{{ url_for('create_instance', project=project) }}">Create a New GWAS Instance</a></li>
+    <li><a href="{{ url_for('choose_project') }}">Choose a New Project</a></li>
+  </p>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Choose Project{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="project">Project ID</label>
+    <input name="project" id="project" required>
+  </form>
+{% endblock %}
