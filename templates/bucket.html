@@ -6,10 +6,20 @@
 
 {% block content %}
   <form method="post">
-    <input type="radio" name="blob" value={{None}}> No Input Data<br>
-    {% for blob in blobs %}
-    	<input type="radio" name="blob" value={{blob}}> {{blob}}<br>
-    {% endfor %}
+    <h3>Genotype Data Source</h3>
+    <fieldset id="genotype">
+      <input type="radio" name="gen_blob" value={{None}}> No Input Data<br>
+      {% for blob in blobs %}
+        <input type="radio" name="gen_blob" value={{blob}}> {{blob}}<br>
+      {% endfor %}
+    </fieldset>
+    <h3>Covariate Data Source</h3>
+    <fieldset>
+      <input type="radio" name="cov_blob" value={{None}}> No Input Data<br>
+      {% for blob in blobs %}
+        <input type="radio" name="cov_blob" value={{blob}}> {{blob}}<br>
+      {% endfor %}
+    </fieldset>
     <input type="submit" value="Submit">
   </form>
   <p style="margin-top:1cm;">

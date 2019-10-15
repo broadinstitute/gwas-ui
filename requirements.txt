@@ -9,3 +9,5 @@ google-auth-httplib2==0.0.3
 google-cloud-storage
 oauth2client
 jinja2
+numpy
+pandas
