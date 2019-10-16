@@ -10,6 +10,9 @@ Each user should also make themselves a Storage Admin for the project using the 
 
 
 Questions
-1) How do I get the covariates for just the 2504 people of interest?
-2) Double check logic of generating phenotype
-3) How does a research lab configure/agree upon GWAS parameters with another research lab? What is the user flow like for this step?
+1) Double check logic of generating phenotype
+2) How does a research lab configure/agree upon GWAS parameters with another research lab? What is the user flow like for this step? Snags with key generation in particular?
+
+Biggest To-Do's Remaining:
+1) Add workflow for "Create New GWAS Instance" option.
+2) Workflow for generating and sharing keys? Assume already done?

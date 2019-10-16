@@ -7,7 +7,7 @@ import random
 def transfer_file_to_instance(project, instance, fname, path, delete_after=False):
 	if path[-1] != '/':
 		path += '/'
-	cmd = 'gcloud compute scp --project "{}" {} {}:{}'.format(project, fname, instance, path)
+	cmd = 'gcloud compute scp --project {} "{}" {}:{}'.format(project, fname, instance, path)
 	os.system(cmd)
 
 	if delete_after:

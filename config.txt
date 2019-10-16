@@ -1,0 +1,9 @@
+CPO external ip
+CP1
+CP2
+S
+P0_P1 port
+P0_P2
+P1_P2
+P1_P3
+P2_P3

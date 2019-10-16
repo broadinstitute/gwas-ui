@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Share pos.txt File{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  {% if is_S %}
+  <p>Make sure to share the pos.txt file donwloaded to your machine with all other parties, so they can upload it to their compute instances.</p>
+  <form method="post">
+    <input type="submit" value="Next" />
+  </form>
+  {% endif %}
+  {% if not is_S %}
+  <p>Please give the path to the pos.txt file that you should have received from the computing party responsible for uploading data to Google Cloud. You will need this file to run the protocol.</p>
+  <form method="post">
+    <label for="fname">Absolute Path of pos.txt File: </label>
+    <input name="fname" id="fname" required>
+  </form>
+  {% endif %}
+{% endblock %}

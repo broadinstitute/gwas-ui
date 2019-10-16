@@ -1,5 +1,6 @@
 from flask import Flask, g, session, flash, request, render_template, redirect, url_for
 import sys
+import os.path
 import pprint
 
 from googleapiclient import discovery
@@ -101,11 +102,46 @@ def choose_bucket(project, zone, instance):
             with open(fname, 'xb') as f:
                 client.download_blob_to_file(cov_blob, f)
             transform_covariate_data(fname, subject_ids)
-            transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=False)
+            transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
 
-        # call next endpoint, passing an extra boolean to signify whether this is S or not
+        is_S = gen_blob is not None
+        return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance, is_S=is_S))
 
     return render_template('bucket.html', blobs=list(all_blobs.keys()))
+
+
+@app.route('/pos/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
+def upload_pos(project, zone, instance, is_S):
+    if request.method == 'POST':
+
+        if is_S:
+            return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
+
+        else:
+            fname = request.form['fname']
+            error = None
+
+            if not fname.endswith('pos.txt'):
+                error = 'Please give full path to the pos.txt file, not just a path to its directory.'
+
+            elif fname.startswith('~'):
+                error = 'Please give absolute path to the pos.txt file, not a relative path.'
+
+            elif not os.path.isfile(fname):
+                error = 'Please give an absolute path to a file that exists on your local machine.'
+
+            if error is None:
+                transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/', delete_after=False)
+                return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
+
+        flash(error)
+
+    return render_template('pos.html', is_S=is_S)
+
+
+@app.route('/role/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
+def choose_role(project, zone, instance, is_S):
+    return '<h>Test</h>'
 
 
 if __name__ == '__main__':
