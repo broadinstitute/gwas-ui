@@ -83,9 +83,11 @@ def choose_bucket(project, zone, instance):
 
     if request.method == 'POST':
         gen_key = request.form['gen_blob']
-        gen_blob = all_blobs[gen_key] if gen_key != 'None' else None
+        gen_blob = all_blobs[gen_key] if (gen_key != 'None' and gen_key != 'Done') else None
         cov_key = request.form['cov_blob']
-        cov_blob = all_blobs[cov_key] if cov_key != 'None' else None
+        cov_blob = all_blobs[cov_key] if (cov_key != 'None' and cov_key != 'Done') else None
+
+        is_S = (gen_blob is not None) or (gen_key == 'Done')
 
         subject_ids = None
         if gen_blob:
@@ -104,7 +106,6 @@ def choose_bucket(project, zone, instance):
             transform_covariate_data(fname, subject_ids)
             transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
 
-        is_S = gen_blob is not None
         return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance, is_S=is_S))
 
     return render_template('bucket.html', blobs=list(all_blobs.keys()))

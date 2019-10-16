@@ -8,14 +8,16 @@
   <form method="post">
     <h3>Genotype Data Source</h3>
     <fieldset id="genotype">
-      <input type="radio" name="gen_blob" value={{None}}> No Input Data<br>
+      <input type="radio" name="gen_blob" value={{'None'}}> No Input Data<br>
+      <input type="radio" name="gen_blob" value={{'Done'}}> Already Uploaded Data to Instance<br>
       {% for blob in blobs %}
         <input type="radio" name="gen_blob" value={{blob}}> {{blob}}<br>
       {% endfor %}
     </fieldset>
     <h3>Covariate Data Source</h3>
     <fieldset>
-      <input type="radio" name="cov_blob" value={{None}}> No Input Data<br>
+      <input type="radio" name="cov_blob" value={{'None'}}> No Input Data<br>
+      <input type="radio" name="cov_blob" value={{'Done'}}> Already Uploaded Data to Instance<br>
       {% for blob in blobs %}
         <input type="radio" name="cov_blob" value={{blob}}> {{blob}}<br>
       {% endfor %}
