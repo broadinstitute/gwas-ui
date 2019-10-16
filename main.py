@@ -6,7 +6,7 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 from google.cloud import storage
 
-from data import transfer_file_to_instance, transform_covariate_data
+from data import transfer_file_to_instance, transform_genotype_data_vcf, transform_covariate_data
 
 
 app = Flask(__name__)
@@ -42,9 +42,12 @@ def choose_instance(project):
     # return page
     if request.method == 'POST':
         instance = request.form['instance']
-        print(instance)
-        tokens = instance.split(',')
-        return redirect(url_for('choose_bucket', project=project, zone=tokens[1], instance=tokens[0]))
+        instance, zone = instance.split(',')
+
+        # actually start the instance
+        compute.instances().start(project=project, zone=zone, instance=instance).execute()
+        
+        return redirect(url_for('choose_bucket', project=project, zone=zone, instance=instance))
 
     all_instances = []
     try:
@@ -82,13 +85,23 @@ def choose_bucket(project, zone, instance):
         gen_blob = all_blobs[gen_key] if gen_key != 'None' else None
         cov_key = request.form['cov_blob']
         cov_blob = all_blobs[cov_key] if cov_key != 'None' else None
+
+        subject_ids = None
+        if gen_blob:
+            fname = 'base-genotypes.gz'
+            with open(fname, 'xb') as f:
+                client.download_blob_to_file(gen_blob, f)
+            subject_ids = transform_genotype_data_vcf(fname)
+            transfer_file_to_instance(project, instance, 'geno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+            transfer_file_to_instance(project, instance, 'pheno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+            transfer_file_to_instance(project, instance, 'pos.txt', '~/secure-gwas/gwas_data/', delete_after=False)
         
         if cov_blob:
             fname = 'base-covariates'
             with open(fname, 'xb') as f:
                 client.download_blob_to_file(cov_blob, f)
-            transform_covariate_data(fname)
-            transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+            transform_covariate_data(fname, subject_ids)
+            transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=False)
 
         # call next endpoint, passing an extra boolean to signify whether this is S or not
 
