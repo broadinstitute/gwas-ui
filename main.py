@@ -202,6 +202,7 @@ def load_config(project, zone, instance, machineid, is_S):
             IP_dict = {}
             port_dict = {}
             proj_dict = {}
+            params = {}
             with open(fname) as f:
                 for i in range(4):
                     line = f.readline()
@@ -214,7 +215,11 @@ def load_config(project, zone, instance, machineid, is_S):
                 for i in range(4):
                     line = f.readline()
                     tokens = line.split()
-                    network_dict[i] = tokens[1]
+                    proj_dict[i] = tokens[1]
+                for i in range(3):
+                    line = f.readline()
+                    tokens = line.split()
+                    params[tokens[0]] = tokens[1]
 
             roles = [machineid]
             if is_S:
@@ -223,7 +228,11 @@ def load_config(project, zone, instance, machineid, is_S):
 
             # generate the command to update the ports and IP addresses on the parameter file stored on the instance
             cmds = []
+
             for role in roles:
+                for k, v in params.items():
+                    cmds.append('sed -i "s|^{k}.*$|{k} {v}|g" ~/secure-gwas/par/test.par.{role}.txt'.format(k=k, v=v, role=role))
+
                 if role == 0:
                     cmds.extend([
                         'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
@@ -272,7 +281,7 @@ def load_config(project, zone, instance, machineid, is_S):
             #         req_body = {
             #             'name': 'net-p{}'.format(role),
             #             'autoCreateSubnetworks': False,
-            #             'routingConfig': {'routingMode': 'REGIONAL'}
+            #             'routingConfig': {'routingMode': 'GLOBAL'}
             #         }
             #         compute.networks().insert(project=project, body=req_body).execute()
 
@@ -285,31 +294,31 @@ def load_config(project, zone, instance, machineid, is_S):
             #         req_body = {
             #             'name': 'sub-p{}'.format(role),
             #             'network': network_url,
-            #             'ipCidrRange': '10.0.{}.0/24'.format(role),
+            #             'ipCidrRange': '10.{}.0.0/24'.format(role), 
             #             'region': zone_to_region(zone)
             #         }
             #         compute.subnetworks().insert(project=project, region=zone_to_region(zone), body=req_body).execute()
 
             # now create the VPC peering connections between communicating instances to allow traffic
-            for role in roles:
-                if role == 0:
-                    connect_roles = [1, 2]
-                elif role == 1:
-                    connect_roles = [0, 2, 3]
-                elif role == 2:
-                    connect_roles = [0, 1, 3]
-                else:
-                    connect_roles = [1, 2]
+            # for role in roles:
+            #     if role == 0:
+            #         connect_roles = [2]#[1, 2]
+            #     elif role == 1:
+            #         connect_roles = [0, 2, 3]
+            #     elif role == 2:
+            #         connect_roles = [0, 1, 3]
+            #     else:
+            #         connect_roles = [1, 2]
 
-                for other in connect_roles:
-                    body = {
-                        'networkPeering': {
-                            'name': 'peer-p{}-p{}'.format(role, other),
-                            'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(network_dict[other], other),
-                            'exchangeSubnetRoutes': True
-                        }
-                    }
-                    compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
+            #     for other in connect_roles:
+            #         body = {
+            #             'networkPeering': {
+            #                 'name': 'peer-p{}-p{}'.format(role, other),
+            #                 'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(proj_dict[other], other),
+            #                 'exchangeSubnetRoutes': True
+            #             }
+            #         }
+            #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
             
             # return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
 
