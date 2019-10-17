@@ -17,3 +17,5 @@ Biggest To-Do's Remaining:
 1) Add workflow for "Create New GWAS Instance" option.
 2) Workflow for generating and sharing keys? Assume already done?
 3) If many parties are running the role of S, just have all IP addresses separated by whitespace in the same line of config.txt, and we can run the protocol one time for each IP address.
+4) Automate VPC network creation (delay problem for adding subnets, peering, firewalls?).
+5) Add other parameters to config file (eg num individuals, covariates, etc).

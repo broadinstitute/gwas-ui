@@ -12,6 +12,8 @@ from data import transfer_file_to_instance, execute_shell_script_on_instance, tr
 
 app = Flask(__name__)
 app.config.from_mapping(SECRET_KEY='dev')
+
+
 credentials = GoogleCredentials.get_application_default()
 compute = discovery.build('compute', 'v1', credentials=credentials)
 role_to_id = {
@@ -20,6 +22,8 @@ role_to_id = {
     'CP2': 2,
     'S': 3
 }
+def zone_to_region(zone):
+    return '-'.join(zone.split('-')[:-1])
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -174,15 +178,15 @@ def choose_role(project, zone, instance, is_S):
             error = "Please choose a valid role before proceeding."
 
         if not error:
-            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, role=role_to_id[role], is_S=is_S))
+            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=is_S))
         
         flash(error)
 
     return render_template('role.html', is_S=is_S)
 
 
-@app.route('/config/<string:project>/<string:zone>/<string:instance>/<int:role>/<int:is_S>', methods=['GET', 'POST'])
-def load_config(project, zone, instance, role, is_S):
+@app.route('/config/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+def load_config(project, zone, instance, machineid, is_S):
     if request.method == 'POST':
         fname = request.form['fname']
         error = None
@@ -203,6 +207,7 @@ def load_config(project, zone, instance, role, is_S):
             # first, obtain external IP addresses and ports from the config file
             IP_dict = {}
             port_dict = {}
+            proj_dict = {}
             with open(fname) as f:
                 for i in range(4):
                     line = f.readline()
@@ -212,45 +217,106 @@ def load_config(project, zone, instance, role, is_S):
                     line = f.readline()
                     tokens = line.split()
                     port_dict[tokens[0]] = tokens[1]
+                for i in range(4):
+                    line = f.readline()
+                    tokens = line.split()
+                    network_dict[i] = tokens[1]
+
+            roles = [machineid]
+            if is_S:
+                roles.append(3)
+            print(roles)
 
             # generate the command to update the ports and IP addresses on the parameter file stored on the instance
             cmds = []
-            if role == 0:
-                cmds.extend([
-                    'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
-                    'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
-                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
-                ])
+            for role in roles:
+                if role == 0:
+                    cmds.extend([
+                        'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
+                        'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
+                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
+                    ])
 
-            if role == 1:
-                cmds.extend([
-                    'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
-                    'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
-                    'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
-                    'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
-                    'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
-                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
-                ])
+                if role == 1:
+                    cmds.extend([
+                        'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
+                        'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
+                        'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
+                        'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
+                        'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
+                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
+                    ])
 
-            if role == 2:
-                cmds.extend([
-                    'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
-                    'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
-                    'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
-                    'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
-                    'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
-                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
-                ])
+                if role == 2:
+                    cmds.extend([
+                        'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
+                        'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
+                        'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
+                        'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
+                        'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
+                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
+                    ])
 
-            if role == 3 or is_S:
-                cmds.extend([
-                    'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
-                    'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
-                    'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
-                    'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
-                ])
+                if role == 3:
+                    cmds.extend([
+                        'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
+                        'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
+                        'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
+                        'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
+                    ])
 
             execute_shell_script_on_instance(project, instance, cmds)
+
+            # then, create a VPC network for communication, if necessary
+            # existing_nets = compute.networks().list(project=project).execute()['items']
+            # for role in roles:
+            #     need_to_create = True
+            #     for net in existing_nets:
+            #         if net['name'] == 'net-p{}'.format(role):
+            #             need_to_create = False
+            #     if need_to_create:
+            #         req_body = {
+            #             'name': 'net-p{}'.format(role),
+            #             'autoCreateSubnetworks': False,
+            #             'routingConfig': {'routingMode': 'REGIONAL'}
+            #         }
+            #         compute.networks().insert(project=project, body=req_body).execute()
+
+            #         # now add a subnet
+            #         # add 30 second delay cause it takes time to create a network
+            #         nets = compute.networks().list(project=project).execute()['items']
+            #         for net in nets:
+            #             if net['name'] == 'net-p{}'.format(role):
+            #                 network_url = net['selfLink']
+            #         req_body = {
+            #             'name': 'sub-p{}'.format(role),
+            #             'network': network_url,
+            #             'ipCidrRange': '10.0.{}.0/24'.format(role),
+            #             'region': zone_to_region(zone)
+            #         }
+            #         compute.subnetworks().insert(project=project, region=zone_to_region(zone), body=req_body).execute()
+
+            # now create the VPC peering connections between communicating instances to allow traffic
+            for role in roles:
+                if role == 0:
+                    connect_roles = [1, 2]
+                elif role == 1:
+                    connect_roles = [0, 2, 3]
+                elif role == 2:
+                    connect_roles = [0, 1, 3]
+                else:
+                    connect_roles = [1, 2]
+
+                for other in connect_roles:
+                    body = {
+                        'networkPeering': {
+                            'name': 'peer-p{}-p{}'.format(role, other),
+                            'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(network_dict[other], other),
+                            'exchangeSubnetRoutes': True
+                        }
+                    }
+                    compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
+            
             # return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
 
         flash(error)
