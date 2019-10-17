@@ -45,12 +45,6 @@ def choose_project():
 
 @app.route('/instance/<string:project>', methods=['GET', 'POST'])
 def choose_instance(project):
-    # from flask import request
-    # assertion = request.headers.get('X-Goog-IAP-JWT-Assertion')
-    # email, id = validate_assertion(assertion)
-    # page = "<h1>Hello {}</h1>".format(email)
-
-    # return page
     if request.method == 'POST':
         instance = request.form['instance']
         error = None
