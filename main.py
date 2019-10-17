@@ -320,11 +320,25 @@ def load_config(project, zone, instance, machineid, is_S):
             #         }
             #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
             
-            # return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
+            return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance, machineid=machineid, is_S=is_S))
 
         flash(error)
 
     return render_template('config.html', is_S=is_S)
+
+
+@app.route('/start/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+def start_gwas(project, zone, instance, machineid, is_S):
+    if request.method == 'POST':
+        return redirect(url_for('gwas_output', project=project, zone=zone, instance=instance,  machineid=machineid, is_S=is_S))
+
+    return render_template('start.html')
+
+
+@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+def gwas_output(project, zone, instance, machineid, is_S):
+    return '<h>Test</h>'
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080)

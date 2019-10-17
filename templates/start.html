@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Start GWAS{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <p>Congrats! Your Google Cloud machine has been successfully configured with the specified parameters, data, and networking preferences. Press 'Enter' whenever you wish to initiate multi-party GWAS on your machine. Note that the protocol will only initiate once each particpant has initiated it on their machine. </p>
+  <form method="post">
+    <input type="submit" value="Enter" />
+  </form>
+{% endblock %}
