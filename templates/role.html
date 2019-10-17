@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Select Secure GWAS Role{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <p>Choose which role you've agreed to play in this run of Secure GWAS. Note: if you are a computing party (one of the CP's), do not choose S, even if you are supplying data for the protocol.</p>
+  <form method="post">
+    <input type="radio" name="role" value="CP0">    CP0<br>
+    <input type="radio" name="role" value="CP1">    CP1<br>
+    <input type="radio" name="role" value="CP2">    CP2<br>
+    <input type="radio" name="role" value="S">    S (not a CP)<br>
+    <input type="submit" value="Submit">
+  </form>
+{% endblock %}

@@ -7,13 +7,19 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 from google.cloud import storage
 
-from data import transfer_file_to_instance, transform_genotype_data_vcf, transform_covariate_data
+from data import transfer_file_to_instance, execute_shell_script_on_instance, transform_genotype_data_vcf, transform_covariate_data
 
 
 app = Flask(__name__)
 app.config.from_mapping(SECRET_KEY='dev')
 credentials = GoogleCredentials.get_application_default()
 compute = discovery.build('compute', 'v1', credentials=credentials)
+role_to_id = {
+    'CP0': 0,
+    'CP1': 1,
+    'CP2': 2,
+    'S': 3
+}
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -43,12 +49,20 @@ def choose_instance(project):
     # return page
     if request.method == 'POST':
         instance = request.form['instance']
-        instance, zone = instance.split(',')
+        error = None
 
-        # actually start the instance
-        compute.instances().start(project=project, zone=zone, instance=instance).execute()
-        
-        return redirect(url_for('choose_bucket', project=project, zone=zone, instance=instance))
+        if not instance:
+            error = 'Instance is required.'
+
+        if error is None:
+            instance, zone = instance.split(',')
+
+            # actually start the instance
+            compute.instances().start(project=project, zone=zone, instance=instance).execute()
+
+            return redirect(url_for('choose_bucket', project=project, zone=zone, instance=instance))
+
+        flash(error)
 
     all_instances = []
     try:
@@ -83,30 +97,38 @@ def choose_bucket(project, zone, instance):
 
     if request.method == 'POST':
         gen_key = request.form['gen_blob']
-        gen_blob = all_blobs[gen_key] if (gen_key != 'None' and gen_key != 'Done') else None
         cov_key = request.form['cov_blob']
-        cov_blob = all_blobs[cov_key] if (cov_key != 'None' and cov_key != 'Done') else None
+        error = None
 
-        is_S = (gen_blob is not None) or (gen_key == 'Done')
+        if not gen_key or not cov_key:
+            error = "Please choose your data sources before proceeding. If you are not playing the role of S, simply choose 'No Input Data'"
 
-        subject_ids = None
-        if gen_blob:
-            fname = 'base-genotypes.gz'
-            with open(fname, 'xb') as f:
-                client.download_blob_to_file(gen_blob, f)
-            subject_ids = transform_genotype_data_vcf(fname)
-            transfer_file_to_instance(project, instance, 'geno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
-            transfer_file_to_instance(project, instance, 'pheno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
-            transfer_file_to_instance(project, instance, 'pos.txt', '~/secure-gwas/gwas_data/', delete_after=False)
-        
-        if cov_blob:
-            fname = 'base-covariates'
-            with open(fname, 'xb') as f:
-                client.download_blob_to_file(cov_blob, f)
-            transform_covariate_data(fname, subject_ids)
-            transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+        if not error:
+            gen_blob = all_blobs[gen_key] if (gen_key != 'None' and gen_key != 'Done') else None
+            cov_blob = all_blobs[cov_key] if (cov_key != 'None' and cov_key != 'Done') else None
 
-        return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance, is_S=is_S))
+            is_S = (gen_blob is not None) or (gen_key == 'Done')
+
+            subject_ids = None
+            if gen_blob:
+                fname = 'base-genotypes.gz'
+                with open(fname, 'xb') as f:
+                    client.download_blob_to_file(gen_blob, f)
+                subject_ids = transform_genotype_data_vcf(fname)
+                transfer_file_to_instance(project, instance, 'geno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+                transfer_file_to_instance(project, instance, 'pheno.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+                transfer_file_to_instance(project, instance, 'pos.txt', '~/secure-gwas/gwas_data/', delete_after=False)
+            
+            if cov_blob:
+                fname = 'base-covariates'
+                with open(fname, 'xb') as f:
+                    client.download_blob_to_file(cov_blob, f)
+                transform_covariate_data(fname, subject_ids)
+                transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
+
+            return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance, is_S=is_S))
+
+        flash(error)
 
     return render_template('bucket.html', blobs=list(all_blobs.keys()))
 
@@ -114,13 +136,15 @@ def choose_bucket(project, zone, instance):
 @app.route('/pos/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
 def upload_pos(project, zone, instance, is_S):
     if request.method == 'POST':
-
         if is_S:
             return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
 
         else:
             fname = request.form['fname']
             error = None
+
+            if not fname:
+                error = 'Please enter a file path before proceeding.'
 
             if not fname.endswith('pos.txt'):
                 error = 'Please give full path to the pos.txt file, not just a path to its directory.'
@@ -142,8 +166,96 @@ def upload_pos(project, zone, instance, is_S):
 
 @app.route('/role/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
 def choose_role(project, zone, instance, is_S):
-    return '<h>Test</h>'
+    if request.method == 'POST':
+        role = request.form['role']
+        error = None
+        
+        if not role:
+            error = "Please choose a valid role before proceeding."
 
+        if not error:
+            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, role=role_to_id[role], is_S=is_S))
+        
+        flash(error)
+
+    return render_template('role.html', is_S=is_S)
+
+
+@app.route('/config/<string:project>/<string:zone>/<string:instance>/<int:role>/<int:is_S>', methods=['GET', 'POST'])
+def load_config(project, zone, instance, role, is_S):
+    if request.method == 'POST':
+        fname = request.form['fname']
+        error = None
+
+        if not fname:
+            error = 'Please enter a file path before proceeding.'
+
+        if not fname.endswith('config.txt'):
+            error = 'Please give full path to the pos.txt file, not just a path to its directory.'
+
+        elif fname.startswith('~'):
+            error = 'Please give absolute path to the pos.txt file, not a relative path.'
+
+        elif not os.path.isfile(fname):
+            error = 'Please give an absolute path to a file that exists on your local machine.'
+
+        if error is None:
+            # first, obtain external IP addresses and ports from the config file
+            IP_dict = {}
+            port_dict = {}
+            with open(fname) as f:
+                for i in range(4):
+                    line = f.readline()
+                    tokens = line.split()
+                    IP_dict[tokens[0]] = tokens[1]
+                for i in range(5):
+                    line = f.readline()
+                    tokens = line.split()
+                    port_dict[tokens[0]] = tokens[1]
+
+            # generate the command to update the ports and IP addresses on the parameter file stored on the instance
+            cmds = []
+            if role == 0:
+                cmds.extend([
+                    'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
+                    'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
+                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
+                ])
+
+            if role == 1:
+                cmds.extend([
+                    'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
+                    'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
+                    'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
+                    'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
+                    'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
+                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
+                ])
+
+            if role == 2:
+                cmds.extend([
+                    'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
+                    'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
+                    'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
+                    'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
+                    'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
+                    'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
+                ])
+
+            if role == 3 or is_S:
+                cmds.extend([
+                    'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
+                    'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
+                    'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
+                    'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
+                ])
+
+            execute_shell_script_on_instance(project, instance, cmds)
+            # return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
+
+        flash(error)
+
+    return render_template('config.html', is_S=is_S)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080)

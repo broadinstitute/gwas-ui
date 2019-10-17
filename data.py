@@ -14,6 +14,12 @@ def transfer_file_to_instance(project, instance, fname, path, delete_after=False
 		os.remove(fname)
 
 
+def execute_shell_script_on_instance(project, instance, cmds):
+	cmd = '; '.join(cmds)
+	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
+	os.system(script)
+
+
 def transform_genotype_data_vcf(fname):
 	# transforms a genotype of the form 0|1 into a genotype of the form 1
 	def genotype_mapper(gen):
