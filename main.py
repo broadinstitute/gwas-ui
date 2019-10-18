@@ -335,13 +335,16 @@ def start_gwas(project, zone, instance, machineid, is_S):
     return render_template('start.html')
 
 
-@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET'])
+@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
 def gwas_output(project, zone, instance, machineid, is_S):
+    if request.method == 'POST':
+        return redirect(url_for('gwas_output2', project=project, zone=zone, instance=instance,  machineid=machineid, is_S=is_S))
+
     # create the commands to run the GWAS protocol
     cmds1 = [
         'cd ~/secure-gwas/code',
         'bin/DataSharingClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
-        'bin/GwasClient {role} ../par/test.par.{role}.txt'.format(role=machineid)
+        'echo completed'
     ]
     cmds2 = [
         'cd ~/secure-gwas/code',
@@ -352,20 +355,50 @@ def gwas_output(project, zone, instance, machineid, is_S):
     def run_cmds():
         if machineid != 3:
             proc = execute_shell_script_asynchronous(project, instance, cmds1)
-            print('test 1')
             if is_S:
                 execute_shell_script_asynchronous(project, instance, cmds2)
-                print('test 2')
         else:
             proc = execute_shell_script_asynchronous(project, instance, cmds2)
         
         # stream the stdout output to the webpage in real time
         for line in iter(proc.stdout.readline, ''):
-            yield line.decode('utf-8').rstrip() + '<br>\n'
-            print('{}: {}'.format(machineid, line.decode('utf-8').rstrip() + '\n'))
+            line_formatted = line.decode('utf-8').rstrip()
+            if line_formatted == 'completed':
+                break
+            if len(line_formatted) > 0:
+                yield line_formatted + '<br>\n'
+                print('{}: {}'.format(machineid, line_formatted))
+
+        # yield '<form method="post"><input type="submit" value="Next" /></form>'
 
     return Response(run_cmds(), mimetype='text/html')
-        
+
+
+@app.route('/gwas2/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+def gwas_output2(project, zone, instance, machineid, is_S):
+     # create the commands to run the GWAS protocol
+    cmds = [
+        'cd ~/secure-gwas/code',
+        'bin/GwasClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
+        'echo completed'
+    ]
+    
+    # execute the commands on the remote machine asynchronously
+    def run_cmds():
+        if machineid != 3:
+            proc = execute_shell_script_asynchronous(project, instance, cmds)
+            
+            # stream the stdout output to the webpage in real time
+            for line in iter(proc.stdout.readline, ''):
+                line_formatted = line.decode('utf-8').rstrip()
+                if line_formatted == 'completed':
+                    break
+                if len(line_formatted) > 0:
+                    yield line_formatted + '<br>\n'
+                    print('{}: {}'.format(machineid, line_formatted))
+                
+    return Response(run_cmds(), mimetype='text/html')
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080)

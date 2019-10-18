@@ -24,10 +24,14 @@ Biggest To-Do's Remaining:
 	- Update code on network creation to use Global routing
 	- Do we need to worry about firewalls? Both to allow traffic and to prevent traffic on non-GWAS ports?
 	- Need to avoid overlapping subnet ranges: make sure all participants ensure the first 3 digits of their instance IP are different, which amounts to creating them in different regions. Then for each subnet, take x.y.z.0/24 for the subnet, where x.y.z.w is the IP address of the instance from that project. Consider deleting a net after GWAS is done, and also think about adding checks to see if peering or network already exists before adding.
-4) Add other parameters to config file (eg num individuals, covariates, etc).
+4) Add other parameters to config file (eg ones other than num individuals, covariates, etc).
 5) Key Generation:
 	- For now, just using existing keys with repo.
 	- Later, might want to rethink/add protocol for generating new keys and sharing the global key/key pairs. Talk to Hoon.
+6) GWAS Orchestration
+	- Issue 1: when transitioning from Data Sharing stage to GWAS stage, suddenly connection can't be created. Issue is probably that there's already a spawned process that isn't being killed? When you fix this, should probably eliminate the whole navigate to new page with button thingy.
+	- Isuse 2: if user 1 presses start and user 2 presses start 10 minutes later, won't work
+	- Need to think about how to orchestrate the GWAS process using some central service
 
 
 Network/Instance Workflow - what I like about this is that it ties instances to networks in a 1:1 mapping.
