@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}GWAS Output{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  {% if num == 2 %}
+    <div class="row">
+    <div class="column">
+      <p>{{output1}}</p>
+    </div>
+    <div class="column">
+      <p>{{output2}}</p>
+    </div>
+    </div>
+  {% endif %}
+  {% if num == 1 %}
+    <p>{{output1}}</p>
+  {% endif %}
+{% endblock %}

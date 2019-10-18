@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import random
+import subprocess
 
 
 def transfer_file_to_instance(project, instance, fname, path, delete_after=False):
@@ -18,6 +19,18 @@ def execute_shell_script_on_instance(project, instance, cmds):
 	cmd = '; '.join(cmds)
 	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
 	os.system(script)
+
+
+def execute_shell_script_asynchronous(project, instance, cmds):
+	cmd = '; '.join(cmds)
+	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
+	subprocess.Popen(script, shell=True)
+
+
+def execute_shell_script_and_capture_output(project, instance, cmds, output):
+	cmd = '; '.join(cmds)
+	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
+	output = subprocess.run(script, shell=True, stdout=subprocess.PIPE).stdout.decode('utf-8')
 
 
 def transform_genotype_data_vcf(fname):

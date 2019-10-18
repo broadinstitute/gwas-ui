@@ -7,7 +7,7 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 from google.cloud import storage
 
-from data import transfer_file_to_instance, execute_shell_script_on_instance, transform_genotype_data_vcf, transform_covariate_data
+from data import *
 
 
 app = Flask(__name__)
@@ -172,7 +172,7 @@ def choose_role(project, zone, instance, is_S):
             error = "Please choose a valid role before proceeding."
 
         if not error:
-            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=is_S))
+            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=(is_S or role == 'S')))
         
         flash(error)
 
@@ -222,7 +222,7 @@ def load_config(project, zone, instance, machineid, is_S):
                     params[tokens[0]] = tokens[1]
 
             roles = [machineid]
-            if is_S:
+            if is_S and machineid != 3:
                 roles.append(3)
             print(roles)
 
@@ -335,10 +335,43 @@ def start_gwas(project, zone, instance, machineid, is_S):
     return render_template('start.html')
 
 
-@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET'])
 def gwas_output(project, zone, instance, machineid, is_S):
+    cmds1 = [
+        'cd ~/secure-gwas/code',
+        'bin/DataSharingClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
+        'bin/GwasClient {role} ../par/test.par.{role}.txt'.format(role=machineid)
+    ]
+    cmds2 = [
+        'cd ~/secure-gwas/code',
+        'bin/DataSharingClient 3 ../par/test.par.3.txt ../gwas_data/'
+    ]
+
+    if machineid != 3:
+        execute_shell_script_asynchronous(project, instance, cmds1)
+    if machineid == 3 or is_S:
+        execute_shell_script_asynchronous(project, instance, cmds2)
     return '<h>Test</h>'
 
+    # output1 = ''
+    # output2 = ''
+    # if machineid != 3 and is_S:
+    #     # execute_shell_script_and_capture_output(project, instance, cmds1, output1)
+    #     # execute_shell_script_and_capture_output(project, instance, cmds2, output2)
+    #     print('test1')
+    #     execute_shell_script_on_instance(project, instance, cmds1)
+    #     print('test2')
+    #     execute_shell_script_on_instance(project, instance, cmds2)
+    #     return render_template('output.html', num=2, output1=output1, output2=output2)
+    
+    # elif machineid != 3:    
+    #     execute_shell_script_on_instance(project, instance, cmds1)
+    #     return render_template('output.html', num=1, output1=output1, output2=None)
+        
+    # else:
+    #     execute_shell_script_on_instance(project, instance, cmds2)
+    #     return render_template('output.html', num=1, output1=output2, output2=None)
+        
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080)
