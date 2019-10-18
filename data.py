@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
 import os
 import random
 import subprocess
+
+import psutil
+import numpy as np
+import pandas as pd
 
 
 def transfer_file_to_instance(project, instance, fname, path, delete_after=False):
@@ -25,6 +27,13 @@ def execute_shell_script_asynchronous(project, instance, cmds):
 	cmd = '; '.join(cmds)
 	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
 	return subprocess.Popen(script, shell=True, stdout=subprocess.PIPE)
+
+
+def kill_asynchronous_process(pid):
+    process = psutil.Process(pid)
+    for proc in process.children(recursive=True):
+        proc.kill()
+    process.kill()
 
 
 def transform_genotype_data_vcf(fname):

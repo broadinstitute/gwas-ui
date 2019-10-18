@@ -335,6 +335,72 @@ def start_gwas(project, zone, instance, machineid, is_S):
     return render_template('start.html')
 
 
+# @app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
+# def gwas_output(project, zone, instance, machineid, is_S):
+#     if request.method == 'POST':
+#         return redirect(url_for('gwas_output2', project=project, zone=zone, instance=instance,  machineid=machineid, is_S=is_S))
+
+#     # create the commands to run the GWAS protocol
+#     cmds1 = [
+#         'cd ~/secure-gwas/code',
+#         'bin/DataSharingClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
+#         'echo completed'
+#     ]
+#     cmds2 = [
+#         'cd ~/secure-gwas/code',
+#         'bin/DataSharingClient 3 ../par/test.par.3.txt ../gwas_data/'
+#     ]
+#     cmds3 = [
+#         'cd ~/secure-gwas/code',
+#         'bin/GwasClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
+#         'echo completed'
+#     ]
+
+#     # execute the commands on the remote machine asynchronously
+#     def run_cmds():
+#         # first run the DataSharing Client
+#         proc2 = None
+#         if machineid != 3:
+#             proc = execute_shell_script_asynchronous(project, instance, cmds1)
+#             if is_S:
+#                 proc2 = execute_shell_script_asynchronous(project, instance, cmds2)
+#         else:
+#             proc = execute_shell_script_asynchronous(project, instance, cmds2)
+
+#         print('{}: process ID is {}'.format(machineid, proc.pid))
+        
+#         # stream the stdout output to the webpage in real time
+#         for line in iter(proc.stdout.readline, ''):
+#             line_formatted = line.decode('utf-8').rstrip()
+#             if line_formatted == 'completed':
+#                 break
+#             if len(line_formatted) > 0:
+#                 yield line_formatted + '<br>\n'
+#                 print('{}: {}'.format(machineid, line_formatted))
+
+#         # kill the spawned process
+#         kill_asynchronous_process(proc.pid)
+#         if is_S:
+#             kill_asynchronous_process(proc2.pid)
+
+#         # then run the actual GWAS Client
+#         if machineid != 3:
+#             proc = execute_shell_script_asynchronous(project, instance, cmds3)
+                    
+#             # stream the stdout output to the webpage in real time
+#             for line in iter(proc.stdout.readline, ''):
+#                 line_formatted = line.decode('utf-8').rstrip()
+#                 if line_formatted == 'completed':
+#                     break
+#                 if len(line_formatted) > 0:
+#                     yield line_formatted + '<br>\n'
+#                     print('{}: {}'.format(machineid, line_formatted))
+
+#             # kill the spawned process
+#             kill_asynchronous_process(proc.pid)
+
+#     return Response(run_cmds(), mimetype='text/html')
+
 @app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
 def gwas_output(project, zone, instance, machineid, is_S):
     if request.method == 'POST':
@@ -353,10 +419,11 @@ def gwas_output(project, zone, instance, machineid, is_S):
 
     # execute the commands on the remote machine asynchronously
     def run_cmds():
+        proc2 = None
         if machineid != 3:
             proc = execute_shell_script_asynchronous(project, instance, cmds1)
             if is_S:
-                execute_shell_script_asynchronous(project, instance, cmds2)
+                proc2 = execute_shell_script_asynchronous(project, instance, cmds2)
         else:
             proc = execute_shell_script_asynchronous(project, instance, cmds2)
         
@@ -369,7 +436,15 @@ def gwas_output(project, zone, instance, machineid, is_S):
                 yield line_formatted + '<br>\n'
                 print('{}: {}'.format(machineid, line_formatted))
 
-        # yield '<form method="post"><input type="submit" value="Next" /></form>'
+        # kill the spawned process
+        proc.terminate()
+        if is_S:
+            proc2.terminate()
+        # kill_asynchronous_process(proc.pid)
+        # if is_S:
+        #     kill_asynchronous_process(proc2.pid)
+
+        yield '<form method="post"><input type="submit" value="Next" /></form>'
 
     return Response(run_cmds(), mimetype='text/html')
 

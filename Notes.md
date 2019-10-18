@@ -32,6 +32,10 @@ Biggest To-Do's Remaining:
 	- Issue 1: when transitioning from Data Sharing stage to GWAS stage, suddenly connection can't be created. Issue is probably that there's already a spawned process that isn't being killed? When you fix this, should probably eliminate the whole navigate to new page with button thingy.
 	- Isuse 2: if user 1 presses start and user 2 presses start 10 minutes later, won't work
 	- Need to think about how to orchestrate the GWAS process using some central service
+7) pos.txt - need to take union
+8) after specifying parameters, populate a table to show the user -> data parameters should be generated based on datasets themselves
+9) Concatenating datasets/running Data Client many times in a row before running GWAS once
+10) doing all data unzipping etc in bucket and keeping in bucket to avoid storage issues on compute instance
 
 
 Network/Instance Workflow - what I like about this is that it ties instances to networks in a 1:1 mapping.
