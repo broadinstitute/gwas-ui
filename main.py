@@ -1,4 +1,4 @@
-from flask import Flask, g, session, flash, request, render_template, redirect, url_for
+from flask import Flask, g, session, flash, request, render_template, redirect, url_for, Response
 import sys
 import os.path
 import pprint
@@ -337,6 +337,7 @@ def start_gwas(project, zone, instance, machineid, is_S):
 
 @app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET'])
 def gwas_output(project, zone, instance, machineid, is_S):
+    # create the commands to run the GWAS protocol
     cmds1 = [
         'cd ~/secure-gwas/code',
         'bin/DataSharingClient {role} ../par/test.par.{role}.txt'.format(role=machineid),
@@ -347,30 +348,23 @@ def gwas_output(project, zone, instance, machineid, is_S):
         'bin/DataSharingClient 3 ../par/test.par.3.txt ../gwas_data/'
     ]
 
-    if machineid != 3:
-        execute_shell_script_asynchronous(project, instance, cmds1)
-    if machineid == 3 or is_S:
-        execute_shell_script_asynchronous(project, instance, cmds2)
-    return '<h>Test</h>'
-
-    # output1 = ''
-    # output2 = ''
-    # if machineid != 3 and is_S:
-    #     # execute_shell_script_and_capture_output(project, instance, cmds1, output1)
-    #     # execute_shell_script_and_capture_output(project, instance, cmds2, output2)
-    #     print('test1')
-    #     execute_shell_script_on_instance(project, instance, cmds1)
-    #     print('test2')
-    #     execute_shell_script_on_instance(project, instance, cmds2)
-    #     return render_template('output.html', num=2, output1=output1, output2=output2)
-    
-    # elif machineid != 3:    
-    #     execute_shell_script_on_instance(project, instance, cmds1)
-    #     return render_template('output.html', num=1, output1=output1, output2=None)
+    # execute the commands on the remote machine asynchronously
+    def run_cmds():
+        if machineid != 3:
+            proc = execute_shell_script_asynchronous(project, instance, cmds1)
+            print('test 1')
+            if is_S:
+                execute_shell_script_asynchronous(project, instance, cmds2)
+                print('test 2')
+        else:
+            proc = execute_shell_script_asynchronous(project, instance, cmds2)
         
-    # else:
-    #     execute_shell_script_on_instance(project, instance, cmds2)
-    #     return render_template('output.html', num=1, output1=output2, output2=None)
+        # stream the stdout output to the webpage in real time
+        for line in iter(proc.stdout.readline, ''):
+            yield line.decode('utf-8').rstrip() + '<br>\n'
+            print('{}: {}'.format(machineid, line.decode('utf-8').rstrip() + '\n'))
+
+    return Response(run_cmds(), mimetype='text/html')
         
 
 if __name__ == '__main__':

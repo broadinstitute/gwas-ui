@@ -24,13 +24,7 @@ def execute_shell_script_on_instance(project, instance, cmds):
 def execute_shell_script_asynchronous(project, instance, cmds):
 	cmd = '; '.join(cmds)
 	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
-	subprocess.Popen(script, shell=True)
-
-
-def execute_shell_script_and_capture_output(project, instance, cmds, output):
-	cmd = '; '.join(cmds)
-	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
-	output = subprocess.run(script, shell=True, stdout=subprocess.PIPE).stdout.decode('utf-8')
+	return subprocess.Popen(script, shell=True, stdout=subprocess.PIPE)
 
 
 def transform_genotype_data_vcf(fname):
