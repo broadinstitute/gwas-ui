@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Created Instance!{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <p>Instance successfully created! Note that it will take some time to set up the code on the instance, so please wait 15 minutes before proceeding.</p>
+  <form method="post">
+    <input type="submit" value="Back" />
+  </form>
+{% endblock %}
+
+

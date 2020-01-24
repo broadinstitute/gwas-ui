@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Specify Instance Details{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="name">Name</label>
+    <input name="name" id="name" required>
+    <fieldset id="zone">
+      {% for option in all_zones %}
+        <input type="radio" name="zone" value={{option}}>{{option}}<br>
+      {% endfor %}
+    </fieldset>
+    <input type="submit" value="Submit">
+  </form>
+{% endblock %}

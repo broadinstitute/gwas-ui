@@ -2,6 +2,7 @@ from flask import Flask, g, session, flash, request, render_template, redirect, 
 import sys
 import os.path
 import pprint
+import time
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
@@ -24,6 +25,9 @@ role_to_id = {
 }
 def zone_to_region(zone):
     return '-'.join(zone.split('-')[:-1])
+def default_network_name(project):
+    return '{}-vpc'.format(project)
+default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -81,7 +85,76 @@ def choose_instance(project):
 
 @app.route('/create/<string:project>', methods=['GET', 'POST'])
 def create_instance(project):
-    return "<h1>Not Implemented Yet</h1>"
+    if request.method == 'POST':
+        name = request.form['name']
+        zone = request.form['zone']
+        error = None
+
+        if not name:
+            error = 'Name is required.'
+
+        if not zone:
+            error = 'Zone is required.'
+
+        if error is None:
+            return redirect(url_for('setup_instance', project=project, name=name, zone=zone))
+
+        flash(error)
+
+    return render_template('create.html', all_zones=default_all_zones)
+
+
+@app.route('/setup/<string:project>/<string:name>/<string:zone>', methods=['GET', 'POST'])
+def setup_instance(project, name, zone):
+    if request.method == 'POST':
+        return redirect(url_for('choose_instance', project=project))
+
+    # first, create VPC network if necessary
+    # this logic for creating a network is not ideal, but it doesn't matter cause we're getting rid of VPC code eventually
+    net_name = default_network_name(project)
+    existing_nets = compute.networks().list(project=project).execute()['items']
+    need_to_create = True
+    for net in existing_nets:
+        if net['name'] == net_name:
+            need_to_create = False
+    if need_to_create:
+        print('creating network')
+        req_body = {
+            'name': net_name,
+            'autoCreateSubnetworks': False,
+            'routingConfig': {'routingMode': 'GLOBAL'}
+        }
+        compute.networks().insert(project=project, body=req_body).execute()
+
+        # now add a subnet
+        # add 30 second delay cause it takes time to create a network
+        time.sleep(30)
+        nets = compute.networks().list(project=project).execute()['items']
+        network_url = ''
+        for net in nets:
+            if net['name'] == net_name:
+                network_url = net['selfLink']
+        req_body = {
+            'name': 'sub-' + net_name,
+            'network': network_url,
+            'ipCidrRange': '10.{}.{}.0/24'.format(random.randint(0, 255), random.randint(0, 255)), 
+            'region': zone_to_region(zone)
+        }
+        compute.subnetworks().insert(project=project, region=zone_to_region(zone), body=req_body).execute()
+
+        # finally, add a firewall rule allowing ingress
+        firewall_body = {
+            'name': 'vpc-allow-ingress',
+            'network': network_url,
+            'priority': 1000,
+            'sourceRanges': ['0.0.0.0/0'],
+            'allowed': [{'IPProtocol': 'all'}]
+        }
+        compute.firewalls().insert(project=project, body=firewall_body).execute()
+
+    # now, actually create the instance
+
+    return render_template('setup.html')
 
 
 @app.route('/data/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
@@ -89,9 +162,12 @@ def choose_bucket(project, zone, instance):
     client = storage.Client(project=project)
     all_blobs = {}
     for bucket in client.list_buckets():
-        for blob in client.list_blobs(bucket):
-            if blob.name[-1] != '/':
-                all_blobs[blob.name] = blob
+        try: 
+            for blob in client.list_blobs(bucket):
+                if blob.name[-1] != '/':
+                    all_blobs[blob.name] = blob
+        except:
+            continue
 
     if request.method == 'POST':
         gen_key = request.form['gen_blob']
@@ -269,35 +345,6 @@ def load_config(project, zone, instance, machineid, is_S):
                     ])
 
             execute_shell_script_on_instance(project, instance, cmds)
-
-            # then, create a VPC network for communication, if necessary
-            # existing_nets = compute.networks().list(project=project).execute()['items']
-            # for role in roles:
-            #     need_to_create = True
-            #     for net in existing_nets:
-            #         if net['name'] == 'net-p{}'.format(role):
-            #             need_to_create = False
-            #     if need_to_create:
-            #         req_body = {
-            #             'name': 'net-p{}'.format(role),
-            #             'autoCreateSubnetworks': False,
-            #             'routingConfig': {'routingMode': 'GLOBAL'}
-            #         }
-            #         compute.networks().insert(project=project, body=req_body).execute()
-
-            #         # now add a subnet
-            #         # add 30 second delay cause it takes time to create a network
-            #         nets = compute.networks().list(project=project).execute()['items']
-            #         for net in nets:
-            #             if net['name'] == 'net-p{}'.format(role):
-            #                 network_url = net['selfLink']
-            #         req_body = {
-            #             'name': 'sub-p{}'.format(role),
-            #             'network': network_url,
-            #             'ipCidrRange': '10.{}.0.0/24'.format(role), 
-            #             'region': zone_to_region(zone)
-            #         }
-            #         compute.subnetworks().insert(project=project, region=zone_to_region(zone), body=req_body).execute()
 
             # now create the VPC peering connections between communicating instances to allow traffic
             # for role in roles:

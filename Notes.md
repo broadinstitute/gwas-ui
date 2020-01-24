@@ -10,20 +10,24 @@ Each user should run `gcloud auth application-default login` in their shell to t
 -need to agree upon parameters
 -need to exchange project names and instance IP addresses (private or external?)
 
+4. Run UI
+. ~ /env/bin/activate
 
-Questions
-1) Double check logic of generating phenotype
+Things that need to be updated each round of data sharing/gwas in parameter file:
+- Num_inds - each dataset might have data for a different number of individuals
+- Cache_file_prefix - one value for each dataset
+
+Assumptions/things that shouldn't change:
+- Num_covs shouldn't change cause individuals from 2 separate datasets should have values for the same covariates
+- Similarly, Num_snps shouldn't change - basically, the shape of the data (number of columns) should be the same for the two datasets, even if the number of subjects/rows changes
 
 Biggest To-Do's Remaining:
-1) Add workflow for "Create New GWAS Instance" option.
-	- Note that this will involve changing the workflow of the demo significantly, because the network needs to be configured before you create the instance. So each project needs to first create a new network, then create the instance, then do all the other config stuff. New issue this brings up: when creating a machine that is both S and CP2, do you create 2 networks? And attach it to both? Or create just one network. Latter makes more sense because a machine can always communicate with itself.
 2) If many parties are running the role of S, just have all IP addresses separated by whitespace in the same line of config.txt, and we can run the protocol one time for each IP address.
-3) Some issues with automating VPC network creation (basically this is barely done):
-	- When creating a subnet, need to make sure the IP address of your instance is actually covered by that subnet LOL.
-	- Need a 30 second delay between create network and create subnet. Also seems like we need a delay between successive attempts to add a new peering to the same machine sometimes.
-	- Update code on network creation to use Global routing
+3) Some issues with VPC networks:
 	- Do we need to worry about firewalls? Both to allow traffic and to prevent traffic on non-GWAS ports?
-	- Need to avoid overlapping subnet ranges: make sure all participants ensure the first 3 digits of their instance IP are different, which amounts to creating them in different regions. Then for each subnet, take x.y.z.0/24 for the subnet, where x.y.z.w is the IP address of the instance from that project. Consider deleting a net after GWAS is done, and also think about adding checks to see if peering or network already exists before adding.
+	- Need to avoid overlapping subnet ranges: subnets need to be of the form 10.x.y.0/24, where x and y are distinct for all users. Right, now I just randomly generate x and y - need to change that.
+	- Consider deleting a net after GWAS is done, and also think about adding checks to see if peering or network already exists before adding.
+	- Need to replace VPC with SSL.
 4) Add other parameters to config file (eg ones other than num individuals, covariates, etc).
 5) Key Generation:
 	- For now, just using existing keys with repo.
@@ -34,8 +38,9 @@ Biggest To-Do's Remaining:
 	- Need to think about how to orchestrate the GWAS process using some central service
 7) pos.txt - need to take union
 8) after specifying parameters, populate a table to show the user -> data parameters should be generated based on datasets themselves
-9) Concatenating datasets/running Data Client many times in a row before running GWAS once
-10) doing all data unzipping etc in bucket and keeping in bucket to avoid storage issues on compute instance
+9) Concatenating datasets/running Data Client many times in a row before running GWAS once; also have delay between successive commands otherwise networking gets ruined, maybe 60 seconds?
+	- instead of concatenating datasets, can run Data Sharing Client many times in a row and GWAS once, but write the secret shares corresponding to each data shard to separate files. Then, during GWAS, read in the covariate/phenotype/genotype data from multiple files instead of a single file by looping over it. For the data sharing part of it, need to update par.txt file with a unique Cache_File_Prefix and also the number of individuals/number of covariates
+10) doing all data unzipping etc in bucket and keeping in bucket to avoid storage issues on compute instance -> maybe a better way to do this is to create an endpoint for uploading data to google cloud storage in which user uploads a VCF file, configures parameters, and gives bucket name and filename - the local webservice then runs the preprocessing and then uploads the file to a new google cloud storage bucket
 
 
 Network/Instance Workflow - what I like about this is that it ties instances to networks in a 1:1 mapping.
