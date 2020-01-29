@@ -9,7 +9,7 @@ echo done installing packages
 
 sudo apt-get --assume-yes install git
 cd ~
-git clone https://github.com/hhcho/secure-gwas.git ~/secure-gwas
+git clone https://github.com/shreyanJ/secure-gwas.git ~/secure-gwas
 echo done cloning into repo
 
 curl -O https://www.shoup.net/ntl/ntl-10.3.0.tar.gz

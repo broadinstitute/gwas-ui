@@ -27,7 +27,10 @@ def zone_to_region(zone):
     return '-'.join(zone.split('-')[:-1])
 def default_network_name(project):
     return '{}-vpc'.format(project)
+def default_subnetwork_name(net_name):
+    return 'sub-' + net_name
 default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
+default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4', 'n1-standard-8']
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -88,6 +91,7 @@ def create_instance(project):
     if request.method == 'POST':
         name = request.form['name']
         zone = request.form['zone']
+        machine_type = request.form['machine']
         error = None
 
         if not name:
@@ -97,15 +101,15 @@ def create_instance(project):
             error = 'Zone is required.'
 
         if error is None:
-            return redirect(url_for('setup_instance', project=project, name=name, zone=zone))
+            return redirect(url_for('setup_instance', project=project, name=name, zone=zone, machine_type=machine_type))
 
         flash(error)
 
-    return render_template('create.html', all_zones=default_all_zones)
+    return render_template('create.html', all_zones=default_all_zones, all_machine_types=default_machine_types)
 
 
-@app.route('/setup/<string:project>/<string:name>/<string:zone>', methods=['GET', 'POST'])
-def setup_instance(project, name, zone):
+@app.route('/setup/<string:project>/<string:name>/<string:zone>/<string:machine_type>', methods=['GET', 'POST'])
+def setup_instance(project, name, zone, machine_type):
     if request.method == 'POST':
         return redirect(url_for('choose_instance', project=project))
 
@@ -135,7 +139,7 @@ def setup_instance(project, name, zone):
             if net['name'] == net_name:
                 network_url = net['selfLink']
         req_body = {
-            'name': 'sub-' + net_name,
+            'name': default_subnetwork_name(net_name),
             'network': network_url,
             'ipCidrRange': '10.{}.{}.0/24'.format(random.randint(0, 255), random.randint(0, 255)), 
             'region': zone_to_region(zone)
@@ -153,6 +157,24 @@ def setup_instance(project, name, zone):
         compute.firewalls().insert(project=project, body=firewall_body).execute()
 
     # now, actually create the instance
+    instance_body = {
+        "name": name,
+        "machineType": "zones/{}/machineTypes/{}".format(zone, machine_type),
+        "networkInterfaces": [{
+            "subnetwork": "regions/{}/subnetworks/{}".format(zone_to_region(zone), default_subnetwork_name(net_name))
+        }],
+        "disks": [{
+            "boot": True,
+            "initializeParams": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-9",
+                "diskSizeGb": 10
+            }
+        }]
+    }
+    compute.instances().insert(project=project, zone=zone, body=instance_body).execute()
+    time.sleep(10)
+    transfer_file_to_instance(project, name, 'startup.sh', '~/', delete_after=False)
+    execute_shell_script_on_instance(project, name, ['chmod u+x startup.sh', './startup.sh'])
 
     return render_template('setup.html')
 

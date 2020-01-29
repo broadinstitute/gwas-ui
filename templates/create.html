@@ -8,9 +8,16 @@
   <form method="post">
     <label for="name">Name</label>
     <input name="name" id="name" required>
+    <p>Zone</p>
     <fieldset id="zone">
       {% for option in all_zones %}
         <input type="radio" name="zone" value={{option}}>{{option}}<br>
+      {% endfor %}
+    </fieldset>
+    <p>Machine Type</p>
+    <fieldset id="machine">
+      {% for option in all_machine_types %}
+        <input type="radio" name="machine" value={{option}}>{{option}}<br>
       {% endfor %}
     </fieldset>
     <input type="submit" value="Submit">

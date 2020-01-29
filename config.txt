@@ -1,16 +1,13 @@
-P0 		10.0.0.2
-P1 		10.1.0.2
-P2 		10.2.0.4
-P3 		10.2.0.4
-P0_P1  	8000
-P0_P2  	8001
-P1_P2  	8000
-P1_P3  	8001
-P2_P3  	8000
-proj0 	broad-cho-priv
-proj1 	broad-cho-priv1
-proj2 	broad-cho-priv2
-proj3	broad-cho-priv2
-NUM_INDS	2504
+IP_ADDR_P0 		10.0.0.2
+IP_ADDR_P1 		10.1.0.2
+IP_ADDR_P2 		10.2.0.4
+CP_ROLE		0
+S_ROLE		2
+NUM_S 		5
+proj0 		broad-cho-priv
+proj1 		broad-cho-priv1
+proj2 		broad-cho-priv2
+proj3		broad-cho-priv2		
+NUM_INDS	2504  1000 1000
 NUM_SNPS	1000
 NUM_COVS	27
