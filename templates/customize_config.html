@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Edit Config Values{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <p>Review, edit, and submit all parameter values before proceeding.</p>s
+  <form method="post">
+    <label for="IP_ADDR_P0">CP0 IP Address</label>
+    <input name="IP_ADDR_P0" id="IP_ADDR_P0" value={{config['IP_ADDR_P0']}} required>
+    <label for="IP_ADDR_P1">CP1 IP Address</label>
+    <input name="IP_ADDR_P1" id="IP_ADDR_P1" value={{config['IP_ADDR_P1']}} required>
+    <label for="IP_ADDR_P2">CP2 IP Address</label>
+    <input name="IP_ADDR_P2" id="IP_ADDR_P2" value={{config['IP_ADDR_P2']}} required>
+    <label for="NUM_S">Number of Data-Sharing Servers</label>
+    <input name="NUM_S" id="NUM_S" value={{config['NUM_S']}} required>
+    <label for="CP_ROLE">CP Role (leave blank if you're not a computing party, otherwise enter a number between 0 and 2) </label>
+    <input name="CP_ROLE" id="CP_ROLE" value={{config['CP_ROLE']}} required>
+
+    <p>Zone</p>
+    <fieldset id="zone">
+      {% for option in all_zones %}
+        <input type="radio" name="zone" value={{option}}>{{option}}<br>
+      {% endfor %}
+    </fieldset>
+    <p>Machine Type</p>
+    <fieldset id="machine">
+      {% for option in all_machine_types %}
+        <input type="radio" name="machine" value={{option}}>{{option}}<br>
+      {% endfor %}
+    </fieldset>
+    <input type="submit" value="Submit">
+  </form>
+{% endblock %}

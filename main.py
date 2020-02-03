@@ -14,7 +14,7 @@ from data import *
 app = Flask(__name__)
 app.config.from_mapping(SECRET_KEY='dev')
 
-
+# Global Variables
 credentials = GoogleCredentials.get_application_default()
 compute = discovery.build('compute', 'v1', credentials=credentials)
 role_to_id = {
@@ -23,14 +23,44 @@ role_to_id = {
     'CP2': 2,
     'S': 3
 }
+default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
+default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4', 'n1-standard-8']
+
+# Schema for the config file used to initialize GWAS MPC protocol
+gwas_config = {
+    'IP_ADDR_P0': '',
+    'IP_ADDR_P1': '',
+    'IP_ADDR_P2': '',
+    'NUM_S': 1,
+    'CP_ROLE': None,
+    'S_ROLE': None,
+    'PROJ0': '',
+    'PROJ1': '',
+    'PROJ2': '',
+    'PROJ3': [''],
+    'NUM_INDS': [0],
+    'NUM_SNPS': 0,
+    'NUM_COVS': 0
+}
+
+def get_P0_P1_ports(num_S):
+    return ' '.join([str(8000 + i) for i in range(num_S)])
+def get_P0_P2_ports(num_S):
+    return ' '.join([str(8001 + i) for i in range(num_S)])
+def get_P1_P2_ports(num_S):
+    return ' '.join([str(8000 + i) for i in range(num_S)])
+def get_P1_P3_ports(num_S):
+    return ' '.join([str(8001 + i) for i in range(num_S)])
+def get_P2_P3_ports(num_S):
+    return ' '.join([str(8000 + i) for i in range(num_S)])
+
+
 def zone_to_region(zone):
     return '-'.join(zone.split('-')[:-1])
 def default_network_name(project):
     return '{}-vpc'.format(project)
 def default_subnetwork_name(net_name):
     return 'sub-' + net_name
-default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
-default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4', 'n1-standard-8']
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -253,32 +283,33 @@ def upload_pos(project, zone, instance, is_S):
 
             if error is None:
                 transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/', delete_after=False)
-                return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
+                return redirect(url_for('load_config', project=project, zone=zone, instance=instance))
 
         flash(error)
 
     return render_template('pos.html', is_S=is_S)
 
 
-@app.route('/role/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
-def choose_role(project, zone, instance, is_S):
-    if request.method == 'POST':
-        role = request.form['role']
-        error = None
+# TODO: Delete this bec
+# @app.route('/role/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
+# def choose_role(project, zone, instance, is_S):
+#     if request.method == 'POST':
+#         role = request.form['role']
+#         error = None
         
-        if not role:
-            error = "Please choose a valid role before proceeding."
+#         if not role:
+#             error = "Please choose a valid role before proceeding."
 
-        if not error:
-            return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=(is_S or role == 'S')))
+#         if not error:
+#             return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=(is_S or role == 'S')))
         
-        flash(error)
+#         flash(error)
 
-    return render_template('role.html', is_S=is_S)
+#     return render_template('role.html', is_S=is_S)
 
 
-@app.route('/config/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
-def load_config(project, zone, instance, machineid, is_S):
+@app.route('/config/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def load_config(project, zone, instance):
     if request.method == 'POST':
         fname = request.form['fname']
         error = None
@@ -287,44 +318,26 @@ def load_config(project, zone, instance, machineid, is_S):
             error = 'Please enter a file path before proceeding.'
 
         if not fname.endswith('config.txt'):
-            error = 'Please give full path to the pos.txt file, not just a path to its directory.'
+            error = 'Please give full path to the config.txt file, not just a path to its directory.'
 
         elif fname.startswith('~'):
-            error = 'Please give absolute path to the pos.txt file, not a relative path.'
+            error = 'Please give absolute path to the config.txt file, not a relative path.'
 
         elif not os.path.isfile(fname):
             error = 'Please give an absolute path to a file that exists on your local machine.'
 
         if error is None:
-            # first, obtain external IP addresses and ports from the config file
-            IP_dict = {}
-            port_dict = {}
-            proj_dict = {}
-            params = {}
-            with open(fname) as f:
-                for i in range(4):
-                    line = f.readline()
-                    tokens = line.split()
-                    IP_dict[tokens[0]] = tokens[1]
-                for i in range(5):
-                    line = f.readline()
-                    tokens = line.split()
-                    port_dict[tokens[0]] = tokens[1]
-                for i in range(4):
-                    line = f.readline()
-                    tokens = line.split()
-                    proj_dict[i] = tokens[1]
-                for i in range(3):
-                    line = f.readline()
-                    tokens = line.split()
-                    params[tokens[0]] = tokens[1]
+            read_config_file(fname, gwas_config)
+            return redirect(url_for('customize_config', project=project, zone=zone, instance=instance))
 
-            roles = [machineid]
-            if is_S and machineid != 3:
-                roles.append(3)
-            print(roles)
+    return render_template('load_config.html')
 
-            # generate the command to update the ports and IP addresses on the parameter file stored on the instance
+
+@app.route('/customizeConfig/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def customize_config(project, zone, instance):
+            
+
+            # generate the command to update the parameter file stored on the instance
             cmds = []
 
             for role in roles:
@@ -389,17 +402,17 @@ def load_config(project, zone, instance, machineid, is_S):
             #         }
             #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
             
-            return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance, machineid=machineid, is_S=is_S))
+            return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance))
 
         flash(error)
 
-    return render_template('config.html', is_S=is_S)
+    return render_template('customize_config.html', config=gwas_config)
 
 
-@app.route('/start/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
-def start_gwas(project, zone, instance, machineid, is_S):
+@app.route('/start/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def start_gwas(project, zone, instance):
     if request.method == 'POST':
-        return redirect(url_for('gwas_output', project=project, zone=zone, instance=instance,  machineid=machineid, is_S=is_S))
+        return redirect(url_for('gwas_output', project=project, zone=zone, instance=instance))
 
     return render_template('start.html')
 
@@ -470,10 +483,10 @@ def start_gwas(project, zone, instance, machineid, is_S):
 
 #     return Response(run_cmds(), mimetype='text/html')
 
-@app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
-def gwas_output(project, zone, instance, machineid, is_S):
+@app.route('/gwas/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def gwas_output(project, zone, instance):
     if request.method == 'POST':
-        return redirect(url_for('gwas_output2', project=project, zone=zone, instance=instance,  machineid=machineid, is_S=is_S))
+        return redirect(url_for('gwas_output2', project=project, zone=zone, instance=instance))
 
     # create the commands to run the GWAS protocol
     cmds1 = [
@@ -518,8 +531,8 @@ def gwas_output(project, zone, instance, machineid, is_S):
     return Response(run_cmds(), mimetype='text/html')
 
 
-@app.route('/gwas2/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
-def gwas_output2(project, zone, instance, machineid, is_S):
+@app.route('/gwas2/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def gwas_output2(project, zone, instance):
      # create the commands to run the GWAS protocol
     cmds = [
         'cd ~/secure-gwas/code',
