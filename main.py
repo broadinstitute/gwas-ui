@@ -29,15 +29,15 @@ default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4
 gwas_config = get_default_config_dict()
 
 def get_P0_P1_ports(num_S):
-    return ' '.join([str(8000 + 2 * i) for i in range(num_S)])
+    return ' '.join([str(8000 + 5 * i) for i in range(num_S)])
 def get_P0_P2_ports(num_S):
-    return ' '.join([str(8001 + 2 * i) for i in range(num_S)])
+    return ' '.join([str(8001 + 5 * i) for i in range(num_S)])
 def get_P1_P2_ports(num_S):
-    return ' '.join([str(8000 + 2 * i) for i in range(num_S)])
+    return ' '.join([str(8002 + 5 * i) for i in range(num_S)])
 def get_P1_P3_ports(num_S):
-    return ' '.join([str(8001 + 2 * i) for i in range(num_S)])
+    return ' '.join([str(8003 + 5 * i) for i in range(num_S)])
 def get_P2_P3_ports(num_S):
-    return ' '.join([str(8000 + 2 * i) for i in range(num_S)])
+    return ' '.join([str(8004 + 5 * i) for i in range(num_S)])
 def get_cache_file_prefixes(num_S, role):
     return ['../cache/data{}_P{}'.format(i, role) for i in range(num_S)]
 
