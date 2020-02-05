@@ -38,6 +38,8 @@ def get_P1_P3_ports(num_S):
     return ' '.join([str(8001 + i) for i in range(num_S)])
 def get_P2_P3_ports(num_S):
     return ' '.join([str(8000 + i) for i in range(num_S)])
+def get_cache_file_prefixes(num_S, role):
+    return ['../cache/data{}_P{}'.format(i, role) for i in range(num_S)]
 
 
 def zone_to_region(zone):
@@ -263,9 +265,8 @@ def load_config(project, zone, instance):
             error = 'Please give an absolute path to a file that exists on your local machine.'
 
         if error is None:
-            print(gwas_config)
             read_config_file(fname, gwas_config)
-            print(gwas_config)
+
             return redirect(url_for('customize_config', project=project, zone=zone, instance=instance))
 
     return render_template('load_config.html')
@@ -278,72 +279,85 @@ def customize_config(project, zone, instance):
             tokens = request.form[key].split()
             update_config_dict(gwas_config, key, tokens)
 
-        print(gwas_config)
+        # generate the commands to update the parameter files stored on the instance
+        def gen_command(search_and_replace_text_pairs, role):
+            cmds = []
+            for k, v in search_and_replace_text_pairs:
+                cmds.append('sed -i "s|^{k}.*$|{k} {v}|g" ~/secure-gwas/par/test.par.{role}.txt'.format(k=k, v=v, role=role))
+            return cmds
 
-        # generate the command to update the parameter file stored on the instance
-        # cmds = []
+        num_S = gwas_config['NUM_S']
+        roles = []
+        if gwas_config['CP_ROLE']:
+            roles.append(gwas_config['CP_ROLE'])
+        if gwas_config['S_ROLE']:
+            roles.apend(3)
+            
+        for role in roles:
+            pairs = []
 
-        # for role in roles:
-        #     for k, v in params.items():
-        #         cmds.append('sed -i "s|^{k}.*$|{k} {v}|g" ~/secure-gwas/par/test.par.{role}.txt'.format(k=k, v=v, role=role))
+            # GWAS Parameters
+            pairs.append(('NUM_INDS', ' '.join([str(x) for x in gwas_config['NUM_INDS']])))
+            pairs.append(('NUM_SNPS', gwas_config['NUM_SNPS']))
+            pairs.append(('NUM_COVS', gwas_config['NUM_COVS']))
 
-        #     if role == 0:
-        #         cmds.extend([
-        #             'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
-        #             'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
-        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
-        #         ])
+            # IP Addresses and Ports
+            if role == 0:
+                pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S)))
+                pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S)))
+            elif role == 1:
+                pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S)))
+                pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
+                pairs.append(('PORT_P1_P3', get_P1_P3_ports(num_S)))
+                pairs.append(('IP_ADDR_P0', gwas_config['IP_ADDR_P0']))
+            elif role == 2:          
+                pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S)))
+                pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
+                pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S)))
+                pairs.append(('IP_ADDR_P0', gwas_config['IP_ADDR_P0']))
+                pairs.append(('IP_ADDR_P1', gwas_config['IP_ADDR_P1']))
+            elif role == 3:
+                pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
+                pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S)))
+                pairs.append(('IP_ADDR_P1', gwas_config['IP_ADDR_P1']))
+                pairs.append(('IP_ADDR_P2', gwas_config['IP_ADDR_P2']))
 
-        #     if role == 1:
-        #         cmds.extend([
-        #             'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
-        #             'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
-        #             'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
-        #             'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
-        #             'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
-        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
-        #         ])
+            # SNP Position File
+            if role < 3:
+                pairs.append(('SNP_POS_FILE', '../gwas_data/pos.txt'))
+                pairs.append(('CACHE_FILE_PREFIX', get_cache_file_prefixes(num_S, role)))
 
-        #     if role == 2:
-        #         cmds.extend([
-        #             'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
-        #             'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
-        #             'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
-        #             'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
-        #             'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
-        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
-        #         ])
-
-        #     if role == 3:
-        #         cmds.extend([
-        #             'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
-        #             'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
-        #             'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
-        #             'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
-        #         ])
-
-        # execute_shell_script_on_instance(project, instance, cmds)
+            execute_shell_script_on_instance(project, instance, gen_command(pairs, role))
 
         # now create the VPC peering connections between communicating instances to allow traffic
-        # for role in roles:
-        #     if role == 0:
-        #         connect_roles = [2]#[1, 2]
-        #     elif role == 1:
-        #         connect_roles = [0, 2, 3]
-        #     elif role == 2:
-        #         connect_roles = [0, 1, 3]
-        #     else:
-        #         connect_roles = [1, 2]
-
-        #     for other in connect_roles:
-        #         body = {
-        #             'networkPeering': {
-        #                 'name': 'peer-p{}-p{}'.format(role, other),
-        #                 'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(proj_dict[other], other),
-        #                 'exchangeSubnetRoutes': True
-        #             }
-        #         }
-        #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
+        peer_gcp_projects = set([])
+        for role in roles:
+            if role == 0:
+                peer_gcp_projects.add(gwas_config['PROJ1'])
+                peer_gcp_projects.add(gwas_config['PROJ2'])
+            elif role == 1:
+                peer_gcp_projects.add(gwas_config['PROJ0'])
+                peer_gcp_projects.add(gwas_config['PROJ2'])
+                for proj in gwas_config['PROJ3']:
+                    peer_gcp_projects.add(proj)
+            elif role == 2:
+                peer_gcp_projects.add(gwas_config['PROJ0'])
+                peer_gcp_projects.add(gwas_config['PROJ1'])
+                for proj in gwas_config['PROJ3']:
+                    peer_gcp_projects.add(proj)
+            else:
+                peer_gcp_projects.add(gwas_config['PROJ0'])
+                peer_gcp_projects.add(gwas_config['PROJ2'])
+        
+        for other_proj in peer_gcp_projects:
+            body = {
+                'networkPeering': {
+                    'name': 'peering-{}'.format(other_proj),
+                    'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/{}'.format(other_proj, default_network_name(other_proj)),
+                    'exchangeSubnetRoutes': True
+                }
+            }
+            compute.networks().addPeering(project=project, network=default_network_name(project), body=body).execute()
         
         return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance))
 
@@ -377,7 +391,8 @@ def upload_pos(project, zone, instance):
                 error = 'Please give an absolute path to a file that exists on your local machine.'
 
             if error is None:
-                transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/', delete_after=False)
+                # should probably take union here
+                transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/pos.txt', delete_after=False)
                 
                 return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance))
 
