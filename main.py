@@ -26,22 +26,7 @@ role_to_id = {
 default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
 default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4', 'n1-standard-8']
 
-# Schema for the config file used to initialize GWAS MPC protocol
-gwas_config = {
-    'IP_ADDR_P0': '',
-    'IP_ADDR_P1': '',
-    'IP_ADDR_P2': '',
-    'NUM_S': 1,
-    'CP_ROLE': None,
-    'S_ROLE': None,
-    'PROJ0': '',
-    'PROJ1': '',
-    'PROJ2': '',
-    'PROJ3': [''],
-    'NUM_INDS': [0],
-    'NUM_SNPS': 0,
-    'NUM_COVS': 0
-}
+gwas_config = get_default_config_dict()
 
 def get_P0_P1_ports(num_S):
     return ' '.join([str(8000 + i) for i in range(num_S)])
@@ -252,60 +237,11 @@ def choose_bucket(project, zone, instance):
                 transform_covariate_data(fname, subject_ids)
                 transfer_file_to_instance(project, instance, 'cov.txt', '~/secure-gwas/gwas_data/', delete_after=True)
 
-            return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance, is_S=is_S))
+            return redirect(url_for('load_config', project=project, zone=zone, instance=instance))
 
         flash(error)
 
     return render_template('bucket.html', blobs=list(all_blobs.keys()))
-
-
-@app.route('/pos/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
-def upload_pos(project, zone, instance, is_S):
-    if request.method == 'POST':
-        if is_S:
-            return redirect(url_for('choose_role', project=project, zone=zone, instance=instance, is_S=is_S))
-
-        else:
-            fname = request.form['fname']
-            error = None
-
-            if not fname:
-                error = 'Please enter a file path before proceeding.'
-
-            if not fname.endswith('pos.txt'):
-                error = 'Please give full path to the pos.txt file, not just a path to its directory.'
-
-            elif fname.startswith('~'):
-                error = 'Please give absolute path to the pos.txt file, not a relative path.'
-
-            elif not os.path.isfile(fname):
-                error = 'Please give an absolute path to a file that exists on your local machine.'
-
-            if error is None:
-                transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/', delete_after=False)
-                return redirect(url_for('load_config', project=project, zone=zone, instance=instance))
-
-        flash(error)
-
-    return render_template('pos.html', is_S=is_S)
-
-
-# TODO: Delete this bec
-# @app.route('/role/<string:project>/<string:zone>/<string:instance>/<int:is_S>', methods=['GET', 'POST'])
-# def choose_role(project, zone, instance, is_S):
-#     if request.method == 'POST':
-#         role = request.form['role']
-#         error = None
-        
-#         if not role:
-#             error = "Please choose a valid role before proceeding."
-
-#         if not error:
-#             return redirect(url_for('load_config', project=project, zone=zone, instance=instance, machineid=role_to_id[role], is_S=(is_S or role == 'S')))
-        
-#         flash(error)
-
-#     return render_template('role.html', is_S=is_S)
 
 
 @app.route('/config/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
@@ -327,7 +263,9 @@ def load_config(project, zone, instance):
             error = 'Please give an absolute path to a file that exists on your local machine.'
 
         if error is None:
+            print(gwas_config)
             read_config_file(fname, gwas_config)
+            print(gwas_config)
             return redirect(url_for('customize_config', project=project, zone=zone, instance=instance))
 
     return render_template('load_config.html')
@@ -335,78 +273,117 @@ def load_config(project, zone, instance):
 
 @app.route('/customizeConfig/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
 def customize_config(project, zone, instance):
-            
+    if request.method == 'POST':     
+        for key in request.form:
+            tokens = request.form[key].split()
+            update_config_dict(gwas_config, key, tokens)
 
-            # generate the command to update the parameter file stored on the instance
-            cmds = []
+        print(gwas_config)
 
-            for role in roles:
-                for k, v in params.items():
-                    cmds.append('sed -i "s|^{k}.*$|{k} {v}|g" ~/secure-gwas/par/test.par.{role}.txt'.format(k=k, v=v, role=role))
+        # generate the command to update the parameter file stored on the instance
+        # cmds = []
 
-                if role == 0:
-                    cmds.extend([
-                        'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
-                        'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
-                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
-                    ])
+        # for role in roles:
+        #     for k, v in params.items():
+        #         cmds.append('sed -i "s|^{k}.*$|{k} {v}|g" ~/secure-gwas/par/test.par.{role}.txt'.format(k=k, v=v, role=role))
 
-                if role == 1:
-                    cmds.extend([
-                        'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
-                        'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
-                        'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
-                        'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
-                        'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
-                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
-                    ])
+        #     if role == 0:
+        #         cmds.extend([
+        #             'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P1']),
+        #             'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.0.txt'.format(port_dict['P0_P2']),
+        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.0.txt'
+        #         ])
 
-                if role == 2:
-                    cmds.extend([
-                        'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
-                        'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
-                        'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
-                        'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
-                        'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
-                        'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
-                    ])
+        #     if role == 1:
+        #         cmds.extend([
+        #             'sed -i "s|^PORT_P0_P1.*$|PORT_P0_P1 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P0_P1']),
+        #             'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P2']),
+        #             'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(port_dict['P1_P3']),
+        #             'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P0']),
+        #             'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.1.txt'.format(IP_dict['P2']),
+        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.1.txt'
+        #         ])
 
-                if role == 3:
-                    cmds.extend([
-                        'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
-                        'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
-                        'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
-                        'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
-                    ])
+        #     if role == 2:
+        #         cmds.extend([
+        #             'sed -i "s|^PORT_P0_P2.*$|PORT_P0_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P0_P2']),
+        #             'sed -i "s|^PORT_P1_P2.*$|PORT_P1_P2 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P1_P2']),
+        #             'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(port_dict['P2_P3']),
+        #             'sed -i "s|^IP_ADDR_P0.*$|IP_ADDR_P0 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P0']),
+        #             'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.2.txt'.format(IP_dict['P1']),
+        #             'sed -i "s|^SNP_POS_FILE.*$|SNP_POS_FILE ../gwas_data/pos.txt|g" ~/secure-gwas/par/test.par.2.txt'
+        #         ])
 
-            execute_shell_script_on_instance(project, instance, cmds)
+        #     if role == 3:
+        #         cmds.extend([
+        #             'sed -i "s|^PORT_P1_P3.*$|PORT_P1_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P1_P3']),
+        #             'sed -i "s|^PORT_P2_P3.*$|PORT_P2_P3 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(port_dict['P2_P3']),
+        #             'sed -i "s|^IP_ADDR_P1.*$|IP_ADDR_P1 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P1']),
+        #             'sed -i "s|^IP_ADDR_P2.*$|IP_ADDR_P2 {}|g" ~/secure-gwas/par/test.par.3.txt'.format(IP_dict['P2']),
+        #         ])
 
-            # now create the VPC peering connections between communicating instances to allow traffic
-            # for role in roles:
-            #     if role == 0:
-            #         connect_roles = [2]#[1, 2]
-            #     elif role == 1:
-            #         connect_roles = [0, 2, 3]
-            #     elif role == 2:
-            #         connect_roles = [0, 1, 3]
-            #     else:
-            #         connect_roles = [1, 2]
+        # execute_shell_script_on_instance(project, instance, cmds)
 
-            #     for other in connect_roles:
-            #         body = {
-            #             'networkPeering': {
-            #                 'name': 'peer-p{}-p{}'.format(role, other),
-            #                 'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(proj_dict[other], other),
-            #                 'exchangeSubnetRoutes': True
-            #             }
-            #         }
-            #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
-            
-            return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance))
+        # now create the VPC peering connections between communicating instances to allow traffic
+        # for role in roles:
+        #     if role == 0:
+        #         connect_roles = [2]#[1, 2]
+        #     elif role == 1:
+        #         connect_roles = [0, 2, 3]
+        #     elif role == 2:
+        #         connect_roles = [0, 1, 3]
+        #     else:
+        #         connect_roles = [1, 2]
+
+        #     for other in connect_roles:
+        #         body = {
+        #             'networkPeering': {
+        #                 'name': 'peer-p{}-p{}'.format(role, other),
+        #                 'network': 'https://www.googleapis.com/compute/v1/projects/{}/global/networks/net-p{}'.format(proj_dict[other], other),
+        #                 'exchangeSubnetRoutes': True
+        #             }
+        #         }
+        #         compute.networks().addPeering(project=project, network='net-p{}'.format(role), body=body).execute()
+        
+        return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance))
 
         flash(error)
 
-    return render_template('customize_config.html', config=gwas_config)
+    return render_template('customize_config.html', config=gwas_config, num_inds=[str(x) for x in gwas_config['NUM_INDS']])
+
+
+@app.route('/pos/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
+def upload_pos(project, zone, instance):
+    is_S = gwas_config['S_ROLE'] is not None
+
+    if request.method == 'POST':
+        if is_S:
+            return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance))
+
+        else:
+            fname = request.form['fname']
+            error = None
+
+            if not fname:
+                error = 'Please enter a file path before proceeding.'
+
+            if not fname.endswith('pos.txt'):
+                error = 'Please give full path to the pos.txt file, not just a path to its directory.'
+
+            elif fname.startswith('~'):
+                error = 'Please give absolute path to the pos.txt file, not a relative path.'
+
+            elif not os.path.isfile(fname):
+                error = 'Please give an absolute path to a file that exists on your local machine.'
+
+            if error is None:
+                transfer_file_to_instance(project, instance, fname, '~/secure-gwas/gwas_data/', delete_after=False)
+                
+                return redirect(url_for('start_gwas', project=project, zone=zone, instance=instance))
+
+        flash(error)
+
+    return render_template('pos.html', is_S=is_S)
 
 
 @app.route('/start/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
@@ -417,6 +394,7 @@ def start_gwas(project, zone, instance):
     return render_template('start.html')
 
 
+# Todo: is this dead code?
 # @app.route('/gwas/<string:project>/<string:zone>/<string:instance>/<int:machineid>/<int:is_S>', methods=['GET', 'POST'])
 # def gwas_output(project, zone, instance, machineid, is_S):
 #     if request.method == 'POST':

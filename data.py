@@ -7,29 +7,55 @@ import numpy as np
 import pandas as pd
 
 
+# Schema for the config file used to initialize GWAS MPC protocol
+def get_default_config_dict():
+	return {
+	    'IP_ADDR_P0': '',
+	    'IP_ADDR_P1': '',
+	    'IP_ADDR_P2': '',
+	    'NUM_S': 1,
+	    'CP_ROLE': None,
+	    'S_ROLE': None,
+	    'PROJ0': '',
+	    'PROJ1': '',
+	    'PROJ2': '',
+	    'PROJ3': [''],
+	    'NUM_INDS': [0],
+	    'NUM_SNPS': 0,
+	    'NUM_COVS': 0
+	}
+
+
+def update_config_dict(config_dict, kw, tokens):
+	# Case 1: string value parameters
+	if kw in ['IP_ADDR_P0', 'IP_ADDR_P1', 'IP_ADDR_P2', 'PROJ0', 'PROJ1', 'PROJ2']:
+		if len(tokens) > 0:
+			config_dict[kw] = tokens[0]
+
+	# Case 2: integer value parameters
+	elif kw in ['NUM_S', 'CP_ROLE', 'S_ROLE', 'NUM_SNPS', 'NUM_COVS']:
+		if len(tokens) > 0:
+			config_dict[kw] = int(tokens[0])
+		else:
+			config_dict[kw] = None
+
+	# Case 3: list of string values
+	elif kw in ['PROJ3']:
+		config_dict[kw] = tokens
+
+	# Case 4: list of integer values
+	elif kw in ['NUM_INDS']:
+		config_dict[kw] = [int(x) for x in tokens]
+
+
+# Turn config file inputted by user into a dictionary fitting above schema
 def read_config_file(fname, config_dict):
 	with open(fname, 'r') as f:
 		for line in f:
-        	tokens = line.split()
-        	kw = tokens[0]
-        	
-        	# Case 1: string value parameters
-        	if kw in ['IP_ADDR_P0', 'IP_ADDR_P1', 'IP_ADDR_P2', 'PROJ0', 'PROJ1', 'PROJ2']:
-        		if len(tokens) > 1:
-        			config_dict[kw] = tokens[1]
+			tokens = line.split()
+			kw = tokens[0]
 
-        	# Case 2: integer value parameters
-        	elif kw in ['NUM_S', 'CP_ROLE', 'S_ROLE', 'NUM_SNPS', 'NUM_COVS']:
-        		if len(tokens) > 1:
-        			config_dict[kw] = int(tokens[1])
-
-        	# Case 3: list of string values
-        	elif kw in ['PROJ3']:
-        		config_dict[kw] = tokens[1:]
-
-        	# Case 4: list of integer values
-        	elif kw in ['NUM_INDS']:
-        		config_dict[kw] = [int(x) for x in tokens[1:]]
+			update_config_dict(config_dict, kw, tokens[1:])
 
 
 def transfer_file_to_instance(project, instance, fname, path, delete_after=False):

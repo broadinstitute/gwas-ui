@@ -5,31 +5,34 @@
 {% endblock %}
 
 {% block content %}
-  <p>Review, edit, and submit all parameter values before proceeding.</p>s
+  <p>Review, edit, and submit all parameter values before proceeding.</p>
   <form method="post">
-    <label for="IP_ADDR_P0">CP0 IP Address</label>
-    <input name="IP_ADDR_P0" id="IP_ADDR_P0" value={{config['IP_ADDR_P0']}} required>
-    <label for="IP_ADDR_P1">CP1 IP Address</label>
-    <input name="IP_ADDR_P1" id="IP_ADDR_P1" value={{config['IP_ADDR_P1']}} required>
-    <label for="IP_ADDR_P2">CP2 IP Address</label>
-    <input name="IP_ADDR_P2" id="IP_ADDR_P2" value={{config['IP_ADDR_P2']}} required>
     <label for="NUM_S">Number of Data-Sharing Servers</label>
-    <input name="NUM_S" id="NUM_S" value={{config['NUM_S']}} required>
+    <input name="NUM_S" id="NUM_S" value={{config['NUM_S']}} required><br>
     <label for="CP_ROLE">CP Role (leave blank if you're not a computing party, otherwise enter a number between 0 and 2) </label>
-    <input name="CP_ROLE" id="CP_ROLE" value={{config['CP_ROLE']}} required>
-
-    <p>Zone</p>
-    <fieldset id="zone">
-      {% for option in all_zones %}
-        <input type="radio" name="zone" value={{option}}>{{option}}<br>
-      {% endfor %}
-    </fieldset>
-    <p>Machine Type</p>
-    <fieldset id="machine">
-      {% for option in all_machine_types %}
-        <input type="radio" name="machine" value={{option}}>{{option}}<br>
-      {% endfor %}
-    </fieldset>
+    <input name="CP_ROLE" id="CP_ROLE" value={{config['CP_ROLE']}}><br>
+    <label for="S_ROLE">S Role (leave blank if you're not a data-sharing server) </label>
+    <input name="S_ROLE" id="S_ROLE" value={{config['S_ROLE']}}><br>
+    <label for="IP_ADDR_P0">CP0 IP Address</label>
+    <input name="IP_ADDR_P0" id="IP_ADDR_P0" value={{config['IP_ADDR_P0']}} required><br>
+    <label for="IP_ADDR_P1">CP1 IP Address</label>
+    <input name="IP_ADDR_P1" id="IP_ADDR_P1" value={{config['IP_ADDR_P1']}} required><br>
+    <label for="IP_ADDR_P2">CP2 IP Address</label>
+    <input name="IP_ADDR_P2" id="IP_ADDR_P2" value={{config['IP_ADDR_P2']}} required><br>
+    <label for="PROJ0">CP0 Google Cloud Project</label>
+    <input name="PROJ0" id="PROJ0" value={{config['PROJ0']}} required><br>
+    <label for="PROJ1">CP1 Google Cloud Project</label>
+    <input name="PROJ1" id="PROJ1" value={{config['PROJ1']}} required><br>
+    <label for="PROJ2">CP2 Google Cloud Project</label>
+    <input name="PROJ2" id="PROJ2" value={{config['PROJ2']}} required><br>
+    <label for="PROJ3">Google Cloud Projects for all S (list separated by whitespace)</label>
+    <input name="PROJ3" id="PROJ3" value="{{'   '.join(config['PROJ3'])}}" required><br>
+    <label for="NUM_INDS">Number of individuals in each dataset (list separated by whitespace)</label>
+    <input name="NUM_INDS" id="NUM_INDS" value="{{'   '.join(num_inds)}}" required><br>
+    <label for="NUM_SNPS">Number of SNPs</label>
+    <input name="NUM_SNPS" id="NUM_SNPS" value={{config['NUM_SNPS']}} required><br>
+    <label for="NUM_COVS">Number of covariates</label>
+    <input name="NUM_COVS" id="NUM_COVS" value={{config['NUM_COVS']}} required><br>
     <input type="submit" value="Submit">
   </form>
 {% endblock %}
