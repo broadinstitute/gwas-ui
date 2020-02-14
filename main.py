@@ -26,7 +26,13 @@ role_to_id = {
 default_all_zones = ['us-central1-a', 'us-east1-b', 'us-east4-c', 'us-west1-b', 'us-west2-b']
 default_machine_types = ['f1-micro', 'g1-small', 'n1-standard-2', 'n1-standard-4', 'n1-standard-8']
 
-gwas_config = get_default_config_dict()
+all_gwas_configs = {}
+def add_gwas_config(project, instance):
+    new_config = get_default_config_dict()
+    all_gwas_configs[project + instance] = new_config
+    return new_config
+def get_gwas_config(project, instance):
+    return all_gwas_configs[project + instance]
 
 def get_P0_P1_ports(num_S):
     return ' '.join([str(8000 + 5 * i) for i in range(num_S)])
@@ -39,15 +45,31 @@ def get_P1_P3_ports(num_S):
 def get_P2_P3_ports(num_S):
     return ' '.join([str(8004 + 5 * i) for i in range(num_S)])
 def get_cache_file_prefixes(num_S, role):
-    return ['../cache/data{}_P{}'.format(i, role) for i in range(num_S)]
+    return ' '.join(['../cache/data{}_P{}'.format(i, role) for i in range(num_S)])
 
 
 def zone_to_region(zone):
     return '-'.join(zone.split('-')[:-1])
 def default_network_name(project):
-    return '{}-vpc'.format(project)
+    if project == 'broad-cho-priv':
+        return 'net-p0'
+    elif project == 'broad-cho-priv1':
+        return 'net-p1'
+    elif project == 'broad-cho-priv2':
+        return 'net-p2'
+    else:
+        raise Error()
+    # return '{}-vpc'.format(project)
 def default_subnetwork_name(net_name):
-    return 'sub-' + net_name
+    if project == 'broad-cho-priv':
+        return 'sub-p0'
+    elif project == 'broad-cho-priv1':
+        return 'sub-p1'
+    elif project == 'broad-cho-priv2':
+        return 'sub-p2'
+    else:
+        raise Error()
+    # return 'sub-' + net_name
 
 
 @app.route('/', methods=('GET', 'POST'))
@@ -265,6 +287,7 @@ def load_config(project, zone, instance):
             error = 'Please give an absolute path to a file that exists on your local machine.'
 
         if error is None:
+            gwas_config = add_gwas_config(project, instance)
             read_config_file(fname, gwas_config)
 
             return redirect(url_for('customize_config', project=project, zone=zone, instance=instance))
@@ -274,6 +297,7 @@ def load_config(project, zone, instance):
 
 @app.route('/customizeConfig/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
 def customize_config(project, zone, instance):
+    gwas_config = get_gwas_config(project, instance)
     if request.method == 'POST':     
         for key in request.form:
             tokens = request.form[key].split()
@@ -282,10 +306,12 @@ def customize_config(project, zone, instance):
         # should probably add more checks here
         error = None
 
-        if gwas_config['S_ROLE'] and (gwas_config['S_ROLE'] < 0 or gwas_config['S_ROLE'] >= gwas_config['NUM_S']):
+        if gwas_config['S_ROLE'] is not None and (gwas_config['S_ROLE'] < 0 or gwas_config['S_ROLE'] >= gwas_config['NUM_S']):
             error = "Make sure that the S role is a number between 0 and Num_S - 1"
 
         if error is None:
+            print("Is acting as S: {}".format(gwas_config['S_ROLE'] is not None))
+            
             # generate the commands to update the parameter files stored on the instance
             def gen_command(search_and_replace_text_pairs, role):
                 cmds = []
@@ -295,10 +321,12 @@ def customize_config(project, zone, instance):
 
             num_S = gwas_config['NUM_S']
             roles = []
-            if gwas_config['CP_ROLE']:
+            if gwas_config['CP_ROLE'] is not None:
                 roles.append(gwas_config['CP_ROLE'])
-            if gwas_config['S_ROLE']:
-                roles.apend(3)
+            if gwas_config['S_ROLE']is not None:
+                roles.append(3)
+
+            print("All machine IDs for this server: {}".format(roles))
                 
             for role in roles:
                 pairs = []
@@ -355,6 +383,20 @@ def customize_config(project, zone, instance):
                 else:
                     peer_gcp_projects.add(gwas_config['PROJ0'])
                     peer_gcp_projects.add(gwas_config['PROJ2'])
+
+            # remove your own project, since networks shouldn't peer with themselves
+            if project in peer_gcp_projects:
+                peer_gcp_projects.remove(project)
+
+            # remove all projects that have already been peered to
+            network_info = compute.networks().get(project=project, network=default_network_name(project)).execute()
+            if 'peerings' in network_info:
+                for peering in network_info['peerings']:
+                    project_name = peering['name'].replace('peering-', '')
+                    if project_name in peer_gcp_projects:
+                        peer_gcp_projects.remove(project_name)
+
+            print(peer_gcp_projects)
             
             for other_proj in peer_gcp_projects:
                 body = {
@@ -365,6 +407,7 @@ def customize_config(project, zone, instance):
                     }
                 }
                 compute.networks().addPeering(project=project, network=default_network_name(project), body=body).execute()
+                time.sleep(20) # need delay between successive operations
             
             return redirect(url_for('upload_pos', project=project, zone=zone, instance=instance))
 
@@ -375,6 +418,7 @@ def customize_config(project, zone, instance):
 
 @app.route('/pos/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
 def upload_pos(project, zone, instance):
+    gwas_config = get_gwas_config(project, instance)
     is_S = gwas_config['S_ROLE'] is not None
 
     if request.method == 'POST':
@@ -421,16 +465,17 @@ def gwas_output(project, zone, instance):
     if request.method == 'POST':
         return redirect(url_for('gwas_output2', project=project, zone=zone, instance=instance))
 
+    gwas_config = get_gwas_config(project, instance)
     all_cmds = []
 
-    if gwas_config['S_ROLE']:
+    if gwas_config['S_ROLE'] is not None:
         all_cmds.append([
             'cd ~/secure-gwas/code',
             'bin/DataSharingClient 3 ../par/test.par.3.txt {} ../gwas_data'.format(gwas_config['S_ROLE']),
             'echo completed'
         ])
-    if gwas_config['CP_ROLE']:
-        for i in range(gwas_config['num_S']):
+    if gwas_config['CP_ROLE']is not None:
+        for i in range(gwas_config['NUM_S']):
             all_cmds.append([
                 'cd ~/secure-gwas/code',
                 'bin/DataSharingClient {role} ../par/test.par.{role}.txt {round}'.format(role=gwas_config['CP_ROLE'], round=i),
@@ -465,8 +510,8 @@ def gwas_output(project, zone, instance):
 # TODO: Still need to update!!!
 @app.route('/gwas2/<string:project>/<string:zone>/<string:instance>', methods=['GET', 'POST'])
 def gwas_output2(project, zone, instance):
-    
-    if gwas_config['CP_ROLE']: 
+    gwas_config = get_gwas_config(project, instance)
+    if gwas_config['CP_ROLE'] is not None: 
         # create the commands to run the GWAS protocol
         cmds = [
             'cd ~/secure-gwas/code',
