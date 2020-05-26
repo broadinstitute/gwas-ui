@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 
 
+# This file contains helper functions used by the main.py file
+
+
 # Schema for the config file used to initialize GWAS MPC protocol
 def get_default_config_dict():
 	return {
@@ -22,29 +25,35 @@ def get_default_config_dict():
 	    'PROJ3': [''],
 	    'NUM_INDS': [0],
 	    'NUM_SNPS': 0,
-	    'NUM_COVS': 0
+	    'NUM_COVS': 0,
+	    'NUM_CHUNKS': [1],
+	    'NUM_THREADS': 1,
+	    'NTL_NUM_THREADS': 0
 	}
 
 
+# Add a new parameter key-value pair to the config dict using values from the UI text form or file inputted by user
 def update_config_dict(config_dict, kw, tokens):
-	# Case 1: string value parameters
-	if kw in ['IP_ADDR_P0', 'IP_ADDR_P1', 'IP_ADDR_P2', 'PROJ0', 'PROJ1', 'PROJ2']:
-		if len(tokens) > 0:
-			config_dict[kw] = tokens[0]
+	schema = get_default_config_dict()
 
-	# Case 2: integer value parameters
-	elif kw in ['NUM_S', 'CP_ROLE', 'S_ROLE', 'NUM_SNPS', 'NUM_COVS']:
+	# Case 1: integer value parameters
+	if schema[kw] is None or type(schema[kw]) == 'int':
 		if len(tokens) > 0:
 			config_dict[kw] = int(tokens[0])
 		else:
 			config_dict[kw] = None
 
+	# Case 2: string value parameters
+	elif type(schema[kw]) == 'str':
+		if len(tokens) > 0:
+			config_dict[kw] = tokens[0]
+
 	# Case 3: list of string values
-	elif kw in ['PROJ3']:
+	elif type(schema[kw]) == 'list' and type(schema[kw][0]) == 'str':
 		config_dict[kw] = tokens
 
 	# Case 4: list of integer values
-	elif kw in ['NUM_INDS']:
+	elif type(schema[kw]) == 'list' and type(schema[kw][0]) == 'int':
 		config_dict[kw] = [int(x) for x in tokens]
 
 
@@ -58,6 +67,7 @@ def read_config_file(fname, config_dict):
 			update_config_dict(config_dict, kw, tokens[1:])
 
 
+# Copy file from local machine to Google Cloud Compute Instance
 def transfer_file_to_instance(project, instance, fname, path, delete_after=False):
 	if path[-1] != '/':
 		path += '/'
@@ -68,12 +78,15 @@ def transfer_file_to_instance(project, instance, fname, path, delete_after=False
 		os.remove(fname)
 
 
+# Execute series of shell commands on Google Cloud Compute Instance
 def execute_shell_script_on_instance(project, instance, cmds):
 	cmd = '; '.join(cmds)
 	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
 	os.system(script)
 
 
+# Execute series of shell commands on Google Cloud Compute Instance in a new process
+# Returns the PID of the created process
 def execute_shell_script_asynchronous(project, instance, cmds):
 	cmd = '; '.join(cmds)
 	script = 'gcloud compute ssh {} --project {} --command \'{}\''.format(instance, project, cmd)
@@ -87,6 +100,7 @@ def kill_asynchronous_process(pid):
     process.kill()
 
 
+# Function for transforming a genotype VCF file into the pheno, geno, and pos text files used by the GWAS code
 def transform_genotype_data_vcf(fname):
 	# transforms a genotype of the form 0|1 into a genotype of the form 1
 	def genotype_mapper(gen):
@@ -122,11 +136,7 @@ def transform_genotype_data_vcf(fname):
 			line = f.readline()
 
 	# now, read the file starting from header
-	df = pd.read_csv(fname, delimiter='\t', encoding='utf-8', skiprows=head_index, nrows=10000)
-
-	# TODO: Eventually remove this
-	# subsample the data to make for fast computation - only want 1000 snps
-	sampled = df.sample(1000)
+	df = pd.read_csv(fname, delimiter='\t', encoding='utf-8', skiprows=head_index)
 
 	# create the position data by reading first 2 columns
 	position_columns = columns[:2]
@@ -157,6 +167,7 @@ def transform_genotype_data_vcf(fname):
 	return columns[offset_index:]
 
 
+# Fucntion for transforming a covariate VCF file into the cov.txt file used by the GWAS code
 def transform_covariate_data(fname, ids):
 	df = pd.read_csv(fname, delimiter='\t', encoding='utf-8')[['Sample name', 'Sex', 'Population code']]
 

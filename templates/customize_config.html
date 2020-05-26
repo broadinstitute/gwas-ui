@@ -33,6 +33,12 @@
     <input name="NUM_SNPS" id="NUM_SNPS" value={{config['NUM_SNPS']}} required><br>
     <label for="NUM_COVS">Number of covariates</label>
     <input name="NUM_COVS" id="NUM_COVS" value={{config['NUM_COVS']}} required><br>
+    <label for="NUM_CHUNKS">Number of chunks per dataset (list separated by whitespace)</label>
+    <input name="NUM_CHUNKS" id="NUM_CHUNKS" value="{{'   '.join(num_chunks)}}" required><br>
+    <label for="NUM_THREADS">Number of threads for OpenMP parallelization</label>
+    <input name="NUM_THREADS" id="NUM_THREADS" value={{config['NUM_THREADS']}} required><br>
+    <label for="NTL_NUM_THREADS">Number of threads for NTL thread boosting</label>
+    <input name="NTL_NUM_THREADS" id="NTL_NUM_THREADS" value={{config['NTL_NUM_THREADS']}} required><br>
     <input type="submit" value="Submit">
   </form>
 {% endblock %}
