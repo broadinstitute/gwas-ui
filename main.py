@@ -46,16 +46,19 @@ def get_gwas_config(project, instance):
     return all_gwas_configs[project + instance]
 
 # Simple helper functions to generate a series of non-overlapping port numbers used for inter-party GWAS communication
-def get_P0_P1_ports(num_S):
-    return ' '.join([str(8000 + 5 * i) for i in range(num_S)])
-def get_P0_P2_ports(num_S):
-    return ' '.join([str(8001 + 5 * i) for i in range(num_S)])
-def get_P1_P2_ports(num_S):
-    return ' '.join([str(8002 + 5 * i) for i in range(num_S)])
-def get_P1_P3_ports(num_S):
-    return ' '.join([str(8003 + 5 * i) for i in range(num_S)])
-def get_P2_P3_ports(num_S):
-    return ' '.join([str(8004 + 5 * i) for i in range(num_S)])
+# Since every dataset needs at least 5 ports (corresponding to the 5 channels CP0-CP1, CP0-CP2, CP1-CP2, CP1-SP, CP2-SP),
+# and since the GWAS code uses different ports for communication between different threads, we need to space out the ports
+# for 2 consecutive datasets by at at least 5 * num_threads
+def get_P0_P1_ports(num_S, num_threads):
+    return ' '.join([str(8000 + 5 * num_threads * i) for i in range(num_S)])
+def get_P0_P2_ports(num_S, num_threads):
+    return ' '.join([str(8001 + 5 * num_threads * i) for i in range(num_S)])
+def get_P1_P2_ports(num_S, num_threads):
+    return ' '.join([str(8002 + 5 * num_threads * i) for i in range(num_S)])
+def get_P1_P3_ports(num_S, num_threads):
+    return ' '.join([str(8003 + 5 * num_threads * i) for i in range(num_S)])
+def get_P2_P3_ports(num_S, num_threads):
+    return ' '.join([str(8004 + 5 * num_threads * i) for i in range(num_S)])
 
 # Simple helper function to generate a series of cache file prefixes corresponding to the different GWAS datasets
 # These cache file prefixes are used to locate the directory where all GWAS secret-shared and intermediate data is written
@@ -368,25 +371,27 @@ def customize_config(project, zone, instance):
                 pairs.append(('NUM_SNPS', gwas_config['NUM_SNPS']))
                 pairs.append(('NUM_COVS', gwas_config['NUM_COVS']))
                 pairs.append(('NUM_CHUNKS', ' '.join([str(x) for x in gwas_config['NUM_CHUNKS']])))
+                pairs.append(('NUM_THREADS', gwas_config['NUM_THREADS']))
+                pairs.append(('NTL_NUM_THREADS', gwas_config['NTL_NUM_THREADS']))
 
                 # IP Addresses and Ports
                 if role == 0:
-                    pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S)))
-                    pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S)))
+                    pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S, gwas_config['NUM_THREADS'])))
                 elif role == 1:
-                    pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S)))
-                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
-                    pairs.append(('PORT_P1_P3', get_P1_P3_ports(num_S)))
+                    pairs.append(('PORT_P0_P1', get_P0_P1_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P1_P3', get_P1_P3_ports(num_S, gwas_config['NUM_THREADS'])))
                     pairs.append(('IP_ADDR_P0', gwas_config['IP_ADDR_P0']))
                 elif role == 2:          
-                    pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S)))
-                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
-                    pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S)))
+                    pairs.append(('PORT_P0_P2', get_P0_P2_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S, gwas_config['NUM_THREADS'])))
                     pairs.append(('IP_ADDR_P0', gwas_config['IP_ADDR_P0']))
                     pairs.append(('IP_ADDR_P1', gwas_config['IP_ADDR_P1']))
                 elif role == 3:
-                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S)))
-                    pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S)))
+                    pairs.append(('PORT_P1_P2', get_P1_P2_ports(num_S, gwas_config['NUM_THREADS'])))
+                    pairs.append(('PORT_P2_P3', get_P2_P3_ports(num_S, gwas_config['NUM_THREADS'])))
                     pairs.append(('IP_ADDR_P1', gwas_config['IP_ADDR_P1']))
                     pairs.append(('IP_ADDR_P2', gwas_config['IP_ADDR_P2']))
 
